@@ -84,6 +84,9 @@ export default function ScanPage({ business }: Props) {
   async function handleFormSubmit() {
     if (!name || name.trim().length < 2) { setError('Please enter your name'); return }
     if (!phone || phone.replace(/\D/g, '').length < 10) { setError('Please enter a valid phone number'); return }
+    // Open review page immediately — must happen before any await or mobile browsers block it
+    window.open(business.google_review_url, '_blank')
+
     setLoading(true)
     setError('')
     try {
@@ -95,7 +98,6 @@ export default function ScanPage({ business }: Props) {
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Something went wrong'); setLoading(false); return }
       setSubmissionId(data.submissionId)
-      window.open(business.google_review_url, '_blank')
       setStep('reviewing')
     } catch {
       setError('Something went wrong. Please try again.')
