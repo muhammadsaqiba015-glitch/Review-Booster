@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     // Get all active businesses
     const { data: businesses } = await supabaseAdmin
       .from('businesses')
-      .select('id, name, google_place_id')
+      .select('id, name, google_place_id, discount_pct')
       .eq('is_active', true)
 
     if (!businesses) return NextResponse.json(results)
