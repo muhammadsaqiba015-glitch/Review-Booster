@@ -26,6 +26,7 @@ interface Business {
 export default function AdminDashboard({ businessSlug }: { businessSlug: string }) {
   const router = useRouter()
   const [session, setSession] = useState<Session | null>(null)
+  const sessionRef = useRef<Session | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
   const [business, setBusiness] = useState<Business | null>(null)
   const [submissions, setSubmissions] = useState<Submission[]>([])
@@ -40,9 +41,17 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
         router.replace('/login')
         return
       }
+      sessionRef.current = session
       setSession(session)
       setAuthChecked(true)
     })
+
+    // Keep sessionRef current if token auto-refreshes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      sessionRef.current = session
+      setSession(session)
+    })
+    return () => subscription.unsubscribe()
   }, [router])
 
   // Generate QR code
@@ -62,14 +71,15 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
   useEffect(() => {
     if (!business) return
     fetchSubmissions()
-    const interval = setInterval(fetchSubmissions, 10000)
+    const interval = setInterval(() => fetchSubmissions(), 10000)
     return () => clearInterval(interval)
-  }, [business])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [business?.id])
 
   function authHeaders() {
     return {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session!.access_token}`,
+      'Authorization': `Bearer ${sessionRef.current!.access_token}`,
     }
   }
 
