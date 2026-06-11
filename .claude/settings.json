@@ -1,7 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Bash(kill -9 533 65333)"
+      "Bash(kill -9 533 65333)",
+      "Bash(git -C /Users/saqib/Downloads/reviewboost status --short)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git -C /Users/saqib/Downloads/reviewboost add components/AdminDashboard.tsx)",
+      "Bash(git -C /Users/saqib/Downloads/reviewboost commit -m \"Remove onAuthStateChange to fix session null race condition\")",
+      "Bash(git -C /Users/saqib/Downloads/reviewboost push)",
+      "Bash(mkdir -p \"/Users/saqib/Downloads/reviewboost/app/coupons/[phone]\")"
+    ],
+    "additionalDirectories": [
+      "/Users/saqib/Downloads/reviewboost/app/coupons"
     ]
   }
 }

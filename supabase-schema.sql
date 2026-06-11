@@ -25,6 +25,7 @@ create index on businesses(owner_id);
 -- Migration: if businesses table already exists, run:
 --   alter table businesses add column if not exists owner_id uuid references auth.users(id);
 --   create index if not exists businesses_owner_id_idx on businesses(owner_id);
+--   alter table businesses add column if not exists redemption_pin text;
 -- ============================================
 
 -- Scans table (every QR scan is logged here)

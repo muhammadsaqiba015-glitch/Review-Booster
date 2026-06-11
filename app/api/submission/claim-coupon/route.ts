@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { generateCouponCode } from '@/lib/utils'
+import { generateCouponCode, sendSMS, formatPKPhone } from '@/lib/utils'
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData()
@@ -89,9 +89,34 @@ export async function POST(req: NextRequest) {
     .eq('id', submission.business_id)
     .single()
 
+  const { data: couponRecord } = await supabaseAdmin
+    .from('coupons')
+    .select('expires_at')
+    .eq('code', code)
+    .single()
+
+  // Send SMS with coupon link + wallet link
+  if (business) {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL
+    const phone = formatPKPhone(submission.customer_phone)
+    const expiryDate = couponRecord?.expires_at
+      ? new Date(couponRecord.expires_at).toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' })
+      : '30 days'
+    const message =
+      `🎉 Shukriya! Aapka ${business.name} review mil gaya.\n\n` +
+      `Aapka coupon: *${code}*\n` +
+      `Discount: ${business.discount_pct}% OFF\n` +
+      `Valid until: ${expiryDate}\n\n` +
+      `Coupon link: ${appUrl}/coupon/${code}\n` +
+      `All coupons: ${appUrl}/coupons/${encodeURIComponent(phone)}\n\n` +
+      `Agli visit pe staff ko ye code batayein ya link show karein.`
+    await sendSMS(phone, message)
+  }
+
   return NextResponse.json({
     couponCode: code,
     discountPct: business?.discount_pct,
     businessName: business?.name,
+    expiresAt: couponRecord?.expires_at ?? null,
   })
 }
