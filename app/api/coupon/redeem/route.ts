@@ -14,12 +14,12 @@ export async function POST(req: NextRequest) {
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Get coupon + business in one query via join (avoids UUID filter quirk)
-  const { data: coupon } = await supabaseAdmin
+  // Fetch all coupons and filter in JS (PostgREST UUID eq has a known quirk)
+  const { data: allCoupons } = await supabaseAdmin
     .from('coupons')
-    .select('id, status, business_id, phone, businesses(id, name, discount_pct, redemption_pin)')
-    .eq('code', code.toUpperCase())
-    .single()
+    .select('id, code, status, business_id, phone, businesses(id, name, discount_pct, redemption_pin)')
+
+  const coupon = (allCoupons || []).find(c => c.code === code.toUpperCase()) ?? null
 
   if (!coupon) return NextResponse.json({ error: 'Coupon not found' }, { status: 404 })
   if (coupon.status === 'redeemed') return NextResponse.json({ error: 'Coupon already used' }, { status: 400 })
@@ -40,11 +40,11 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Mark as redeemed
+  // Mark as redeemed — filter by code (text) to avoid UUID eq quirk
   const { error: updateError } = await supabaseAdmin
     .from('coupons')
     .update({ status: 'redeemed', redeemed_at: new Date().toISOString() })
-    .eq('id', coupon.id)
+    .eq('code', coupon.code)
 
   if (updateError) return NextResponse.json({ error: 'Failed to redeem' }, { status: 500 })
 

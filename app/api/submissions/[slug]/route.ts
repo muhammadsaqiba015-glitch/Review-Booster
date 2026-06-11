@@ -19,7 +19,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     return NextResponse.json({ error: 'Business not found' }, { status: 404 })
   }
 
-  // Fetch all and filter in JS — PostgREST UUID eq filter has a known quirk
+  // Fetch all rows + filter in JS (PostgREST UUID eq has a known quirk)
   const { data: allRows, error: subError } = await supabaseAdmin
     .from('review_submissions')
     .select('id, customer_name, customer_phone, created_at, coupon_generated, coupon_code, screenshot_url, business_id')
@@ -31,5 +31,21 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   }
 
   const submissions = (allRows || []).filter(s => s.business_id === business.id)
-  return NextResponse.json({ submissions })
+
+  // Fetch coupon statuses for submissions that have a coupon code
+  const { data: allCoupons } = await supabaseAdmin
+    .from('coupons')
+    .select('code, status, expires_at')
+
+  const couponStatusMap: Record<string, string> = {}
+  for (const c of allCoupons || []) {
+    couponStatusMap[c.code] = c.status
+  }
+
+  const enriched = submissions.map(s => ({
+    ...s,
+    coupon_status: s.coupon_code ? (couponStatusMap[s.coupon_code] ?? null) : null,
+  }))
+
+  return NextResponse.json({ submissions: enriched })
 }

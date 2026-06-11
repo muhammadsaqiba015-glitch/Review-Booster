@@ -95,8 +95,8 @@ export async function POST(req: NextRequest) {
     .eq('code', code)
     .single()
 
-  // Send SMS with coupon link + wallet link
-  if (business) {
+  // Send SMS with coupon link + wallet link (best-effort — never block the coupon)
+  try { if (business) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
     const phone = formatPKPhone(submission.customer_phone)
     const expiryDate = couponRecord?.expires_at
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
       `All coupons: ${appUrl}/coupons/${encodeURIComponent(phone)}\n\n` +
       `Agli visit pe staff ko ye code batayein ya link show karein.`
     await sendSMS(phone, message)
-  }
+  } } catch { /* SMS failure must not block coupon delivery */ }
 
   return NextResponse.json({
     couponCode: code,

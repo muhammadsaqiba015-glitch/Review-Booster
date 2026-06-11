@@ -13,6 +13,7 @@ interface Submission {
   coupon_generated: boolean
   coupon_code: string | null
   screenshot_url: string | null
+  coupon_status: 'active' | 'redeemed' | 'expired' | null
 }
 
 interface Business {
@@ -119,20 +120,22 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
     }
   }
 
-  async function handleRedeem() {
-    if (!redeemCode.trim()) return
+  async function handleRedeem(overrideCode?: string) {
+    const code = overrideCode ?? redeemCode
+    if (!code.trim()) return
     setRedeeming(true)
     setRedeemResult(null)
     try {
       const res = await fetch('/api/coupon/redeem', {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ code: redeemCode.trim().toUpperCase(), pin, adminOverride: true }),
+        body: JSON.stringify({ code: code.trim().toUpperCase(), pin, adminOverride: true }),
       })
       const data = await res.json()
       if (res.ok) {
         setRedeemResult({ success: true, message: `✓ Redeemed — ${data.discountPct}% off applied for ${data.businessName}` })
         setRedeemCode('')
+        fetchSubmissions()
       } else {
         setRedeemResult({ error: data.error })
       }
@@ -383,13 +386,31 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
                 )}
 
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  {sub.coupon_generated ? (
+                  {sub.coupon_code ? (
                     <>
-                      <p style={{ color: '#4ade80', fontSize: '12px', fontWeight: '600', margin: '0 0 2px' }}>✓ Coupon issued</p>
-                      <p style={{ color: '#555', fontSize: '12px', margin: 0, fontFamily: 'monospace', letterSpacing: '1px' }}>{sub.coupon_code}</p>
+                      <p style={{ color: '#555', fontSize: '11px', margin: '0 0 4px', fontFamily: 'monospace', letterSpacing: '1px' }}>
+                        {sub.coupon_code}
+                      </p>
+                      {sub.coupon_status === 'active' && (
+                        <button
+                          onClick={() => handleRedeem(sub.coupon_code!)}
+                          style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: '#4ade80', color: '#0f0f0f', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                        >
+                          Mark Redeemed
+                        </button>
+                      )}
+                      {sub.coupon_status === 'redeemed' && (
+                        <p style={{ color: '#555', fontSize: '12px', margin: 0, fontWeight: '600' }}>✓ Redeemed</p>
+                      )}
+                      {sub.coupon_status === 'expired' && (
+                        <p style={{ color: '#f87171', fontSize: '12px', margin: 0 }}>Expired</p>
+                      )}
+                      {!sub.coupon_status && (
+                        <p style={{ color: '#4ade80', fontSize: '12px', margin: 0, fontWeight: '600' }}>✓ Issued</p>
+                      )}
                     </>
                   ) : (
-                    <p style={{ color: '#666', fontSize: '12px', margin: 0 }}>No coupon yet</p>
+                    <p style={{ color: '#555', fontSize: '12px', margin: 0 }}>No coupon</p>
                   )}
                 </div>
               </div>
