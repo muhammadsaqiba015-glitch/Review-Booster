@@ -45,14 +45,12 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
       setSession(session)
       setAuthChecked(true)
     })
-
-    // Keep sessionRef current if token auto-refreshes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      sessionRef.current = session
-      setSession(session)
-    })
-    return () => subscription.unsubscribe()
   }, [router])
+
+  // Keep sessionRef in sync whenever session state updates
+  useEffect(() => {
+    if (session) sessionRef.current = session
+  }, [session])
 
   // Generate QR code
   useEffect(() => {
