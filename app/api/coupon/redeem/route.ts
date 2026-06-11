@@ -14,10 +14,10 @@ export async function POST(req: NextRequest) {
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Get coupon + business
+  // Get coupon + business in one query via join (avoids UUID filter quirk)
   const { data: coupon } = await supabaseAdmin
     .from('coupons')
-    .select('id, status, business_id, phone')
+    .select('id, status, business_id, phone, businesses(id, name, discount_pct, redemption_pin)')
     .eq('code', code.toUpperCase())
     .single()
 
@@ -26,13 +26,7 @@ export async function POST(req: NextRequest) {
   if (coupon.status === 'expired') return NextResponse.json({ error: 'Coupon has expired' }, { status: 400 })
   if (coupon.status !== 'active') return NextResponse.json({ error: 'Coupon is not active' }, { status: 400 })
 
-  // Verify PIN against business
-  const { data: business } = await supabaseAdmin
-    .from('businesses')
-    .select('id, name, discount_pct, redemption_pin')
-    .eq('id', coupon.business_id)
-    .single()
-
+  const business = Array.isArray(coupon.businesses) ? coupon.businesses[0] : coupon.businesses
   if (!business) return NextResponse.json({ error: 'Business not found' }, { status: 404 })
 
   // PIN check — skip if admin override
