@@ -236,7 +236,7 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
               }}
             />
             <button
-              onClick={handleRedeem}
+              onClick={() => handleRedeem()}
               disabled={redeeming || !redeemCode.trim()}
               style={{
                 padding: '12px 24px',
