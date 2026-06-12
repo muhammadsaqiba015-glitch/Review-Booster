@@ -13,7 +13,9 @@
       "Bash(git -C /Users/saqib/Downloads/reviewboost add app/api/coupon/redeem/route.ts)",
       "Bash(git -C /Users/saqib/Downloads/reviewboost commit -m \"Fix business lookup in redeem route using join\")",
       "Bash(git -C /Users/saqib/Downloads/reviewboost add -A)",
-      "Bash(git -C /Users/saqib/Downloads/reviewboost commit -m \"Fix redeem: JS filter, inline buttons, SMS try/catch\")"
+      "Bash(git -C /Users/saqib/Downloads/reviewboost commit -m \"Fix redeem: JS filter, inline buttons, SMS try/catch\")",
+      "Bash(git -C /Users/saqib/Downloads/reviewboost commit -m \"Fix onClick type error on handleRedeem\")",
+      "Bash(git -C /Users/saqib/Downloads/reviewboost commit -m \"Fix Unauthorized: remove JWT check from redeem route\")"
     ],
     "additionalDirectories": [
       "/Users/saqib/Downloads/reviewboost/app/coupons"
