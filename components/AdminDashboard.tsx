@@ -83,7 +83,18 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
     if (!business) return
     fetchSubmissions()
     const interval = setInterval(() => fetchSubmissions(), 10000)
-    return () => clearInterval(interval)
+
+    // Refetch the moment the tab regains focus / visibility (timers freeze in
+    // background tabs, so this catches up instantly when you come back).
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchSubmissions() }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [business?.id])
 
