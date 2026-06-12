@@ -10,9 +10,14 @@ export async function POST(req: NextRequest) {
   // implicit since only authenticated admins can see coupon codes in their dashboard
 
   // Fetch all coupons and filter in JS (PostgREST UUID eq has a known quirk)
-  const { data: allCoupons } = await supabaseAdmin
+  const { data: allCoupons, error: fetchError } = await supabaseAdmin
     .from('coupons')
-    .select('id, code, status, business_id, phone, businesses(id, name, discount_pct, redemption_pin)')
+    .select('id, code, status, business_id, phone, businesses(id, name, discount_pct)')
+
+  if (fetchError) {
+    console.error('Coupon fetch error:', fetchError.message)
+    return NextResponse.json({ error: 'Failed to fetch coupons' }, { status: 500 })
+  }
 
   const coupon = (allCoupons || []).find(c => c.code === code.toUpperCase()) ?? null
 
@@ -27,10 +32,16 @@ export async function POST(req: NextRequest) {
   // PIN check — skip if admin override
   if (!adminOverride) {
     if (!pin) return NextResponse.json({ error: 'PIN required' }, { status: 400 })
-    if (!business.redemption_pin) {
+    // Fetch all businesses + find by id in JS (avoids UUID eq quirk)
+    const { data: allBiz } = await supabaseAdmin
+      .from('businesses')
+      .select('id, redemption_pin')
+    const biz = (allBiz || []).find(b => b.id === coupon.business_id)
+    const redemptionPin = biz?.redemption_pin
+    if (!redemptionPin) {
       return NextResponse.json({ error: 'Redemption PIN not set. Ask the owner to set a PIN in their dashboard.' }, { status: 400 })
     }
-    if (business.redemption_pin !== pin) {
+    if (redemptionPin !== pin) {
       return NextResponse.json({ error: 'Incorrect PIN' }, { status: 401 })
     }
   }
