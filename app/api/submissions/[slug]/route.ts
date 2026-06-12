@@ -10,21 +10,21 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // Look up business by slug (text eq is fine), verify ownership in JS
   const { data: business } = await supabaseAdmin
     .from('businesses')
-    .select('id')
+    .select('id, owner_id')
     .eq('slug', params.slug)
-    .eq('owner_id', user.id)
-    .single()
+    .maybeSingle()
 
-  if (!business) {
+  if (!business || business.owner_id !== user.id) {
     return NextResponse.json({ error: 'Business not found' }, { status: 404 })
   }
 
-  // Fetch all rows + filter in JS (PostgREST UUID eq has a known quirk)
+  // Fetch all submissions, filter by business_id in JS (avoids UUID eq quirk)
   const { data: allRows, error: subError } = await supabaseAdmin
     .from('review_submissions')
-    .select('id, customer_name, customer_phone, created_at, coupon_generated, coupon_code, screenshot_url, business_id')
+    .select('id, customer_name, customer_phone, created_at, coupon_code, business_id')
     .order('created_at', { ascending: false })
 
   if (subError) {
@@ -33,21 +33,5 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   }
 
   const submissions = (allRows || []).filter(s => s.business_id === business.id)
-
-  // Fetch coupon statuses for submissions that have a coupon code
-  const { data: allCoupons } = await supabaseAdmin
-    .from('coupons')
-    .select('code, status, expires_at')
-
-  const couponStatusMap: Record<string, string> = {}
-  for (const c of allCoupons || []) {
-    couponStatusMap[c.code] = c.status
-  }
-
-  const enriched = submissions.map(s => ({
-    ...s,
-    coupon_status: s.coupon_code ? (couponStatusMap[s.coupon_code] ?? null) : null,
-  }))
-
-  return NextResponse.json({ submissions: enriched })
+  return NextResponse.json({ submissions })
 }

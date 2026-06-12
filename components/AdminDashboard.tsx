@@ -10,10 +10,7 @@ interface Submission {
   customer_name: string
   customer_phone: string
   created_at: string
-  coupon_generated: boolean
   coupon_code: string | null
-  screenshot_url: string | null
-  coupon_status: 'active' | 'redeemed' | 'expired' | null
 }
 
 interface Business {
@@ -138,14 +135,8 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
       if (res.ok) {
         setRedeemResult({ success: true, message: `✓ Redeemed — ${data.discountPct}% off applied for ${data.businessName}` })
         setRedeemCode('')
-        setSubmissions(prev => prev.map(s => s.coupon_code === code ? { ...s, coupon_status: 'redeemed' } : s))
-        fetchSubmissions()
       } else {
         setRedeemResult({ error: data.error })
-        // Self-heal: if it's already used, reflect that in the list so the button clears
-        if (data.error === 'Coupon already used') {
-          setSubmissions(prev => prev.map(s => s.coupon_code === code ? { ...s, coupon_status: 'redeemed' } : s))
-        }
       }
     } catch {
       setRedeemResult({ error: 'Something went wrong' })
@@ -290,7 +281,7 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {[
               { label: 'Total submissions', value: submissions.length },
-              { label: 'Coupons issued', value: submissions.filter(s => s.coupon_generated).length },
+              { label: 'Coupons issued', value: submissions.filter(s => s.coupon_code).length },
               { label: 'Discount offered', value: business ? `${business.discount_pct}%` : '—' },
             ].map(stat => (
               <div key={stat.label} style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: '12px', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -383,40 +374,11 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
                   <p style={{ color: '#444', fontSize: '12px', margin: 0 }}>{timeAgo(sub.created_at)}</p>
                 </div>
 
-                {sub.screenshot_url && (
-                  <a href={sub.screenshot_url} target="_blank" rel="noreferrer">
-                    <img
-                      src={sub.screenshot_url}
-                      alt="Review screenshot"
-                      style={{ width: '52px', height: '52px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #333', flexShrink: 0 }}
-                    />
-                  </a>
-                )}
-
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   {sub.coupon_code ? (
-                    <>
-                      <p style={{ color: '#555', fontSize: '11px', margin: '0 0 4px', fontFamily: 'monospace', letterSpacing: '1px' }}>
-                        {sub.coupon_code}
-                      </p>
-                      {sub.coupon_status === 'active' && (
-                        <button
-                          onClick={() => handleRedeem(sub.coupon_code!)}
-                          style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: '#4ade80', color: '#0f0f0f', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
-                        >
-                          Mark Redeemed
-                        </button>
-                      )}
-                      {sub.coupon_status === 'redeemed' && (
-                        <p style={{ color: '#555', fontSize: '12px', margin: 0, fontWeight: '600' }}>✓ Redeemed</p>
-                      )}
-                      {sub.coupon_status === 'expired' && (
-                        <p style={{ color: '#f87171', fontSize: '12px', margin: 0 }}>Expired</p>
-                      )}
-                      {!sub.coupon_status && (
-                        <p style={{ color: '#4ade80', fontSize: '12px', margin: 0, fontWeight: '600' }}>✓ Issued</p>
-                      )}
-                    </>
+                    <p style={{ color: '#888', fontSize: '13px', margin: 0, fontFamily: 'monospace', letterSpacing: '1px' }}>
+                      {sub.coupon_code}
+                    </p>
                   ) : (
                     <p style={{ color: '#555', fontSize: '12px', margin: 0 }}>No coupon</p>
                   )}
