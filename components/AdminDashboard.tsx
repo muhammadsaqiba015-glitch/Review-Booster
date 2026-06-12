@@ -138,11 +138,14 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
       if (res.ok) {
         setRedeemResult({ success: true, message: `✓ Redeemed — ${data.discountPct}% off applied for ${data.businessName}` })
         setRedeemCode('')
-        // Optimistically mark matching rows redeemed so the button disappears instantly
         setSubmissions(prev => prev.map(s => s.coupon_code === code ? { ...s, coupon_status: 'redeemed' } : s))
         fetchSubmissions()
       } else {
         setRedeemResult({ error: data.error })
+        // Self-heal: if it's already used, reflect that in the list so the button clears
+        if (data.error === 'Coupon already used') {
+          setSubmissions(prev => prev.map(s => s.coupon_code === code ? { ...s, coupon_status: 'redeemed' } : s))
+        }
       }
     } catch {
       setRedeemResult({ error: 'Something went wrong' })

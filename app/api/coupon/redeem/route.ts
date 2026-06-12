@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: NextRequest) {
   const { code, pin, adminOverride, businessId } = await req.json()
 

@@ -11,9 +11,11 @@ export default function OnboardCallback() {
   const [errorMsg, setErrorMsg] = useState('')
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event !== 'SIGNED_IN' || !session) return
+    let handled = false
 
+    async function proceed(session: import('@supabase/supabase-js').Session) {
+      if (handled) return
+      handled = true
       setState('creating')
 
       const pending = localStorage.getItem('pending_business')
@@ -45,23 +47,42 @@ export default function OnboardCallback() {
           setState('error')
         }
       } else {
-        // Returning owner — look up their business
-        const { data: business } = await supabase
-          .from('businesses')
-          .select('slug')
-          .eq('owner_id', session.user.id)
-          .maybeSingle()
-
-        if (business) {
-          router.replace(`/admin/${business.slug}`)
-        } else {
-          // Authenticated but no business yet — send to onboard
+        // Returning owner — find their business via the API (service role, reliable)
+        try {
+          const res = await fetch('/api/my-business', {
+            headers: { 'Authorization': `Bearer ${session.access_token}` },
+          })
+          const data = await res.json()
+          if (res.ok && data.slug) {
+            router.replace(`/admin/${data.slug}`)
+          } else {
+            router.replace('/onboard')
+          }
+        } catch {
           router.replace('/onboard')
         }
       }
+    }
+
+    // 1) Handle the case where the session is already established (token in URL parsed)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) proceed(session)
     })
 
-    return () => subscription.unsubscribe()
+    // 2) Also listen for the sign-in event as a backup
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) proceed(session)
+    })
+
+    // 3) If nothing happened within 5s, the magic link was likely stale
+    const timeout = setTimeout(() => {
+      if (!handled) {
+        setErrorMsg('This sign-in link has expired or was already used. Please request a new one.')
+        setState('error')
+      }
+    }, 5000)
+
+    return () => { subscription.unsubscribe(); clearTimeout(timeout) }
   }, [router])
 
   const cardStyle: React.CSSProperties = {
@@ -94,7 +115,7 @@ export default function OnboardCallback() {
           </h1>
           <p style={{ color: '#888', fontSize: '14px', margin: '0 0 24px' }}>{errorMsg}</p>
           <button
-            onClick={() => router.replace('/onboard')}
+            onClick={() => router.replace('/login')}
             style={{
               padding: '12px 24px',
               borderRadius: '10px',
@@ -106,7 +127,7 @@ export default function OnboardCallback() {
               cursor: 'pointer',
             }}
           >
-            Try again
+            Request a new link
           </button>
         </div>
       </div>
