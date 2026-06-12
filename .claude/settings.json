@@ -17,7 +17,9 @@
       "Bash(git -C /Users/saqib/Downloads/reviewboost commit -m \"Fix onClick type error on handleRedeem\")",
       "Bash(git -C /Users/saqib/Downloads/reviewboost commit -m \"Fix Unauthorized: remove JWT check from redeem route\")",
       "Bash(git -C /Users/saqib/Downloads/reviewboost commit -m \"Fix PIN path business lookup, remove redemption_pin from join\")",
-      "Bash(git -C /Users/saqib/Downloads/reviewboost commit -m \"New coupon per submission, instant redeemed status, cross-business redeem guard\")"
+      "Bash(git -C /Users/saqib/Downloads/reviewboost commit -m \"New coupon per submission, instant redeemed status, cross-business redeem guard\")",
+      "Bash(npx next *)",
+      "Bash(git -C /Users/saqib/Downloads/reviewboost commit -m \"Fix stale auth token: fetch fresh session token on every request\")"
     ],
     "additionalDirectories": [
       "/Users/saqib/Downloads/reviewboost/app/coupons"

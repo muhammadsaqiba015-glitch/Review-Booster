@@ -89,16 +89,19 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [business?.id])
 
-  function authHeaders() {
+  // Always pull a fresh token — Supabase auto-refreshes it under the hood,
+  // so this never goes stale even if the tab stays open for hours.
+  async function authHeaders() {
+    const { data: { session } } = await supabase.auth.getSession()
     return {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${sessionRef.current!.access_token}`,
+      'Authorization': `Bearer ${session?.access_token ?? ''}`,
     }
   }
 
   async function fetchBusiness() {
     try {
-      const res = await fetch(`/api/business/${businessSlug}`, { headers: authHeaders() })
+      const res = await fetch(`/api/business/${businessSlug}`, { headers: await authHeaders() })
       if (res.status === 401 || res.status === 403) { router.replace('/login'); return }
       const data = await res.json()
       setBusiness(data)
@@ -109,7 +112,7 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
 
   async function fetchSubmissions() {
     try {
-      const res = await fetch(`/api/submissions/${businessSlug}`, { headers: authHeaders() })
+      const res = await fetch(`/api/submissions/${businessSlug}`, { headers: await authHeaders() })
       if (res.status === 401 || res.status === 403) return
       const data = await res.json()
       setSubmissions(data.submissions || [])
@@ -128,7 +131,7 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
     try {
       const res = await fetch('/api/coupon/redeem', {
         method: 'POST',
-        headers: authHeaders(),
+        headers: await authHeaders(),
         body: JSON.stringify({ code, pin, adminOverride: true, businessId: business?.id }),
       })
       const data = await res.json()
@@ -154,7 +157,7 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
     try {
       const res = await fetch('/api/business/set-pin', {
         method: 'POST',
-        headers: authHeaders(),
+        headers: await authHeaders(),
         body: JSON.stringify({ pin, slug: businessSlug }),
       })
       if (res.ok) { setPinSaved(true); setTimeout(() => setPinSaved(false), 3000) }
