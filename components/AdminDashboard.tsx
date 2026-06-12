@@ -37,6 +37,7 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
   const [business, setBusiness] = useState<Business | null>(null)
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [loading, setLoading] = useState(true)
+  const [lastSync, setLastSync] = useState('')
   const [qrDataUrl, setQrDataUrl] = useState('')
 
   // Redeem coupon (admin)
@@ -98,7 +99,10 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
 
   async function fetchBusiness() {
     try {
-      const res = await fetch(`/api/business/${businessSlug}`, { headers: await authHeaders() })
+      const res = await fetch(`/api/business/${businessSlug}?t=${Date.now()}`, {
+        headers: await authHeaders(),
+        cache: 'no-store',
+      })
       if (res.status === 401 || res.status === 403) { router.replace('/login'); return }
       const data = await res.json()
       setBusiness(data)
@@ -109,10 +113,14 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
 
   async function fetchSubmissions() {
     try {
-      const res = await fetch(`/api/submissions/${businessSlug}`, { headers: await authHeaders() })
+      const res = await fetch(`/api/submissions/${businessSlug}?t=${Date.now()}`, {
+        headers: await authHeaders(),
+        cache: 'no-store',
+      })
       if (res.status === 401 || res.status === 403) return
       const data = await res.json()
       setSubmissions(data.submissions || [])
+      setLastSync(new Date().toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
       setLoading(false)
     } catch (err) {
       console.error('Failed to fetch submissions:', err)
@@ -341,9 +349,20 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
         </div>
 
         {/* Submissions */}
-        <h2 style={{ color: '#fff', fontSize: '18px', fontWeight: '600', margin: '0 0 16px' }}>
-          Review submissions
-        </h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 16px', flexWrap: 'wrap', gap: '8px' }}>
+          <h2 style={{ color: '#fff', fontSize: '18px', fontWeight: '600', margin: 0 }}>
+            Review submissions ({submissions.length})
+          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {lastSync && <span style={{ color: '#444', fontSize: '12px' }}>Synced {lastSync}</span>}
+            <button
+              onClick={() => fetchSubmissions()}
+              style={{ background: 'none', border: '1px solid #333', color: '#888', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}
+            >
+              ↻ Refresh
+            </button>
+          </div>
+        </div>
 
         {loading ? (
           <p style={{ color: '#555', textAlign: 'center', padding: '40px' }}>Loading...</p>

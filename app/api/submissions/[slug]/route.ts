@@ -33,5 +33,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   }
 
   const submissions = (allRows || []).filter(s => s.business_id === business.id)
-  return NextResponse.json({ submissions })
+  return NextResponse.json({ submissions }, {
+    headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+  })
 }
