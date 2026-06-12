@@ -39,42 +39,29 @@ export async function POST(req: NextRequest) {
     // Storage upload is best-effort; coupon still gets issued
   }
 
-  // Check if coupon already issued for this phone + business
-  const { data: existing } = await supabaseAdmin
-    .from('coupons')
-    .select('code, status')
-    .eq('business_id', submission.business_id)
-    .eq('phone', submission.customer_phone)
-    .in('status', ['active', 'pending'])
-    .maybeSingle()
-
-  let code: string
-  if (existing) {
-    code = existing.code
-  } else {
+  // Generate a fresh unique coupon for every review submission
+  let code = generateCouponCode()
+  let attempts = 0
+  while (attempts < 5) {
+    const { data: clash } = await supabaseAdmin.from('coupons').select('id').eq('code', code).maybeSingle()
+    if (!clash) break
     code = generateCouponCode()
-    let attempts = 0
-    while (attempts < 5) {
-      const { data: clash } = await supabaseAdmin.from('coupons').select('id').eq('code', code).maybeSingle()
-      if (!clash) break
-      code = generateCouponCode()
-      attempts++
-    }
+    attempts++
+  }
 
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
-    const { error: couponError } = await supabaseAdmin.from('coupons').insert({
-      business_id: submission.business_id,
-      phone: submission.customer_phone,
-      code,
-      status: 'active',
-      activated_at: new Date().toISOString(),
-      expires_at: expiresAt,
-    })
+  const { error: couponError } = await supabaseAdmin.from('coupons').insert({
+    business_id: submission.business_id,
+    phone: submission.customer_phone,
+    code,
+    status: 'active',
+    activated_at: new Date().toISOString(),
+    expires_at: expiresAt,
+  })
 
-    if (couponError) {
-      return NextResponse.json({ error: 'Failed to generate coupon' }, { status: 500 })
-    }
+  if (couponError) {
+    return NextResponse.json({ error: 'Failed to generate coupon' }, { status: 500 })
   }
 
   // Update submission record

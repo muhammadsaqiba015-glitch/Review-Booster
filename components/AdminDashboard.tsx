@@ -121,20 +121,22 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
   }
 
   async function handleRedeem(overrideCode?: string) {
-    const code = overrideCode ?? redeemCode
-    if (!code.trim()) return
+    const code = (overrideCode ?? redeemCode).trim().toUpperCase()
+    if (!code) return
     setRedeeming(true)
     setRedeemResult(null)
     try {
       const res = await fetch('/api/coupon/redeem', {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ code: code.trim().toUpperCase(), pin, adminOverride: true }),
+        body: JSON.stringify({ code, pin, adminOverride: true, businessId: business?.id }),
       })
       const data = await res.json()
       if (res.ok) {
         setRedeemResult({ success: true, message: `✓ Redeemed — ${data.discountPct}% off applied for ${data.businessName}` })
         setRedeemCode('')
+        // Optimistically mark matching rows redeemed so the button disappears instantly
+        setSubmissions(prev => prev.map(s => s.coupon_code === code ? { ...s, coupon_status: 'redeemed' } : s))
         fetchSubmissions()
       } else {
         setRedeemResult({ error: data.error })

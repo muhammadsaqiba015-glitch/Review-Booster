@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(req: NextRequest) {
-  const { code, pin, adminOverride } = await req.json()
+  const { code, pin, adminOverride, businessId } = await req.json()
 
   if (!code) return NextResponse.json({ error: 'Missing coupon code' }, { status: 400 })
 
@@ -28,6 +28,11 @@ export async function POST(req: NextRequest) {
 
   const business = Array.isArray(coupon.businesses) ? coupon.businesses[0] : coupon.businesses
   if (!business) return NextResponse.json({ error: 'Business not found' }, { status: 404 })
+
+  // Cross-business guard: admin can only redeem coupons of the business they're viewing
+  if (adminOverride && businessId && coupon.business_id !== businessId) {
+    return NextResponse.json({ error: 'This coupon belongs to a different business' }, { status: 403 })
+  }
 
   // PIN check — skip if admin override
   if (!adminOverride) {
