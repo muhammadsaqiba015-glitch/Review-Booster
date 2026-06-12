@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+export const revalidate = 0
 
 export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
   const token = req.headers.get('Authorization')?.replace('Bearer ', '')

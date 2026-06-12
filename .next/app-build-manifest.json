@@ -31,6 +31,22 @@
       "static/chunks/main-app-db126619762ae038.js",
       "static/chunks/app/coupon/[code]/page-56c947aef1bd66f9.js"
     ],
+    "/login/page": [
+      "static/chunks/webpack-35b091ca5c5192ac.js",
+      "static/chunks/fd9d1056-4e1a26e2d413ba3c.js",
+      "static/chunks/23-4ba92329db203080.js",
+      "static/chunks/main-app-db126619762ae038.js",
+      "static/chunks/44530001-16f5a5d47a74a15e.js",
+      "static/chunks/385-c377a331181175a8.js",
+      "static/chunks/app/login/page-48ab8460f32aaefb.js"
+    ],
+    "/coupons/[phone]/page": [
+      "static/chunks/webpack-35b091ca5c5192ac.js",
+      "static/chunks/fd9d1056-4e1a26e2d413ba3c.js",
+      "static/chunks/23-4ba92329db203080.js",
+      "static/chunks/main-app-db126619762ae038.js",
+      "static/chunks/app/coupons/[phone]/page-2e48adaca81a6678.js"
+    ],
     "/onboard/callback/page": [
       "static/chunks/webpack-35b091ca5c5192ac.js",
       "static/chunks/fd9d1056-4e1a26e2d413ba3c.js",
@@ -39,13 +55,6 @@
       "static/chunks/44530001-16f5a5d47a74a15e.js",
       "static/chunks/385-c377a331181175a8.js",
       "static/chunks/app/onboard/callback/page-ecc3ca2d5603e562.js"
-    ],
-    "/r/[slug]/page": [
-      "static/chunks/webpack-35b091ca5c5192ac.js",
-      "static/chunks/fd9d1056-4e1a26e2d413ba3c.js",
-      "static/chunks/23-4ba92329db203080.js",
-      "static/chunks/main-app-db126619762ae038.js",
-      "static/chunks/app/r/[slug]/page-15cd149a0ce4230d.js"
     ],
     "/onboard/page": [
       "static/chunks/webpack-35b091ca5c5192ac.js",
@@ -56,21 +65,12 @@
       "static/chunks/385-c377a331181175a8.js",
       "static/chunks/app/onboard/page-fa1d80837f94d982.js"
     ],
-    "/coupons/[phone]/page": [
+    "/r/[slug]/page": [
       "static/chunks/webpack-35b091ca5c5192ac.js",
       "static/chunks/fd9d1056-4e1a26e2d413ba3c.js",
       "static/chunks/23-4ba92329db203080.js",
       "static/chunks/main-app-db126619762ae038.js",
-      "static/chunks/app/coupons/[phone]/page-2e48adaca81a6678.js"
-    ],
-    "/login/page": [
-      "static/chunks/webpack-35b091ca5c5192ac.js",
-      "static/chunks/fd9d1056-4e1a26e2d413ba3c.js",
-      "static/chunks/23-4ba92329db203080.js",
-      "static/chunks/main-app-db126619762ae038.js",
-      "static/chunks/44530001-16f5a5d47a74a15e.js",
-      "static/chunks/385-c377a331181175a8.js",
-      "static/chunks/app/login/page-48ab8460f32aaefb.js"
+      "static/chunks/app/r/[slug]/page-15cd149a0ce4230d.js"
     ],
     "/page": [
       "static/chunks/webpack-35b091ca5c5192ac.js",
