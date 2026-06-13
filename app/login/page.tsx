@@ -1,33 +1,47 @@
 'use client'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { usernameToEmail } from '@/lib/username'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
+  const router = useRouter()
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
 
   async function handleLogin() {
-    if (!email || !email.includes('@')) { setError('Enter a valid email address'); return }
+    if (!username.trim()) { setError('Enter your username'); return }
+    if (!password) { setError('Enter your password'); return }
     setLoading(true)
     setError('')
 
-    const { error: authError } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/onboard/callback`,
-      },
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
+      email: usernameToEmail(username),
+      password,
     })
 
-    if (authError) {
-      setError(authError.message)
+    if (authError || !data.session) {
+      setError('Incorrect username or password')
       setLoading(false)
       return
     }
 
-    setSent(true)
-    setLoading(false)
+    // Find this owner's business
+    try {
+      const res = await fetch('/api/my-business', {
+        headers: { 'Authorization': `Bearer ${data.session.access_token}` },
+      })
+      const result = await res.json()
+      if (res.ok && result.slug) {
+        router.replace(`/admin/${result.slug}`)
+      } else {
+        router.replace('/onboard')
+      }
+    } catch {
+      router.replace('/onboard')
+    }
   }
 
   const cardStyle: React.CSSProperties = {
@@ -50,30 +64,16 @@ export default function LoginPage() {
     border: '1px solid #2a2a2a',
   }
 
-  if (sent) {
-    return (
-      <div style={cardStyle}>
-        <div style={boxStyle}>
-          <div style={{ fontSize: '40px', marginBottom: '16px' }}>📬</div>
-          <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: '700', margin: '0 0 12px' }}>
-            Check your email
-          </h1>
-          <p style={{ color: '#888', fontSize: '15px', lineHeight: '1.6', margin: '0 0 16px' }}>
-            We sent a magic link to <span style={{ color: '#fff' }}>{email}</span>.
-            Click it to access your dashboard.
-          </p>
-          <p style={{ color: '#555', fontSize: '13px', margin: 0 }}>
-            Didn't get it?{' '}
-            <span
-              style={{ color: '#4ade80', cursor: 'pointer' }}
-              onClick={() => setSent(false)}
-            >
-              Resend
-            </span>
-          </p>
-        </div>
-      </div>
-    )
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '13px 16px',
+    borderRadius: '12px',
+    border: '1px solid #333',
+    background: '#0f0f0f',
+    color: '#fff',
+    fontSize: '15px',
+    outline: 'none',
+    boxSizing: 'border-box',
   }
 
   return (
@@ -84,30 +84,34 @@ export default function LoginPage() {
           Owner login
         </h1>
         <p style={{ color: '#666', fontSize: '14px', margin: '0 0 32px' }}>
-          Enter your email and we'll send a magic link to your dashboard.
+          Log in with your username and password.
         </p>
+
+        <div style={{ marginBottom: '14px', textAlign: 'left' }}>
+          <label style={{ color: '#aaa', fontSize: '13px', display: 'block', marginBottom: '8px' }}>
+            Username
+          </label>
+          <input
+            type="text"
+            autoCapitalize="none"
+            placeholder="alis_karahi"
+            value={username}
+            onChange={e => { setUsername(e.target.value); setError('') }}
+            style={inputStyle}
+          />
+        </div>
 
         <div style={{ marginBottom: '8px', textAlign: 'left' }}>
           <label style={{ color: '#aaa', fontSize: '13px', display: 'block', marginBottom: '8px' }}>
-            Email address
+            Password
           </label>
           <input
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={e => { setEmail(e.target.value); setError('') }}
+            type="password"
+            placeholder="Your password"
+            value={password}
+            onChange={e => { setPassword(e.target.value); setError('') }}
             onKeyDown={e => e.key === 'Enter' && handleLogin()}
-            style={{
-              width: '100%',
-              padding: '13px 16px',
-              borderRadius: '12px',
-              border: '1px solid #333',
-              background: '#0f0f0f',
-              color: '#fff',
-              fontSize: '15px',
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
+            style={inputStyle}
           />
         </div>
 
@@ -126,10 +130,10 @@ export default function LoginPage() {
             fontSize: '15px',
             fontWeight: '600',
             cursor: loading ? 'not-allowed' : 'pointer',
-            marginTop: '8px',
+            marginTop: '12px',
           }}
         >
-          {loading ? 'Sending...' : 'Send magic link →'}
+          {loading ? 'Logging in...' : 'Log in →'}
         </button>
 
         <p style={{ color: '#555', fontSize: '13px', marginTop: '24px' }}>

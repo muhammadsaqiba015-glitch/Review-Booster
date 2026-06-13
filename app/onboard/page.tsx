@@ -1,8 +1,10 @@
 'use client'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { usernameToEmail, isValidUsername } from '@/lib/username'
 
-type Step = 'details' | 'email' | 'sent'
+type Step = 'details' | 'account'
 
 const cardStyle: React.CSSProperties = {
   minHeight: '100vh',
@@ -43,16 +45,20 @@ const labelStyle: React.CSSProperties = {
 }
 
 export default function OnboardPage() {
+  const router = useRouter()
   const [step, setStep] = useState<Step>('details')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Form fields
+  // Business fields
   const [businessName, setBusinessName] = useState('')
   const [reviewUrl, setReviewUrl] = useState('')
   const [discountPct, setDiscountPct] = useState('15')
   const [whatsapp, setWhatsapp] = useState('')
-  const [email, setEmail] = useState('')
+
+  // Account fields
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
 
   function validateDetails() {
     if (!businessName.trim() || businessName.trim().length < 2) return 'Enter your business name'
@@ -68,49 +74,71 @@ export default function OnboardPage() {
     const err = validateDetails()
     if (err) { setError(err); return }
     setError('')
-    setStep('email')
+    setStep('account')
   }
 
-  async function handleSendMagicLink() {
-    if (!email || !email.includes('@')) { setError('Enter a valid email address'); return }
+  async function handleCreateAccount() {
+    if (!isValidUsername(username)) { setError('Username must be 3–30 letters, numbers, or underscores'); return }
+    if (password.length < 6) { setError('Password must be at least 6 characters'); return }
     setLoading(true)
     setError('')
 
-    const details = {
-      name: businessName.trim(),
-      reviewUrl: reviewUrl.trim(),
-      discountPct: parseInt(discountPct),
-      phone: whatsapp.trim(),
-    }
-
-    // Fast path for same-device: localStorage
-    localStorage.setItem('pending_business', JSON.stringify(details))
-
-    // Cross-device path: persist server-side keyed by email so the callback
-    // can create the business even if the link is opened on another device
-    try {
-      await fetch('/api/onboard/save-pending', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...details, email: email.trim().toLowerCase() }),
-      })
-    } catch { /* localStorage fallback still covers same-device */ }
-
-    const { error: authError } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/onboard/callback`,
-      },
+    // 1) Create the auth account (instant — email confirmation is disabled in Supabase)
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email: usernameToEmail(username),
+      password,
     })
 
-    if (authError) {
-      setError(authError.message)
+    if (signUpError) {
+      const msg = signUpError.message.toLowerCase().includes('already')
+        ? 'That username is taken. Try another.'
+        : signUpError.message
+      setError(msg)
       setLoading(false)
       return
     }
 
-    setStep('sent')
-    setLoading(false)
+    // Make sure we have a session (sign in if signUp didn't return one)
+    let session = signUpData.session
+    if (!session) {
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: usernameToEmail(username),
+        password,
+      })
+      if (signInError || !signInData.session) {
+        setError('Account created but sign-in failed. Try logging in.')
+        setLoading(false)
+        return
+      }
+      session = signInData.session
+    }
+
+    // 2) Create the business in the same session
+    try {
+      const res = await fetch('/api/onboard/create-business', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          name: businessName.trim(),
+          reviewUrl: reviewUrl.trim(),
+          discountPct: parseInt(discountPct),
+          phone: whatsapp.trim(),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.slug) {
+        setError(data.error || 'Failed to create business')
+        setLoading(false)
+        return
+      }
+      router.replace(`/admin/${data.slug}`)
+    } catch {
+      setError('Something went wrong. Please try again.')
+      setLoading(false)
+    }
   }
 
   const primaryBtn = (disabled = false): React.CSSProperties => ({
@@ -197,74 +225,66 @@ export default function OnboardPage() {
           <button onClick={handleDetailsNext} style={primaryBtn()}>
             Continue →
           </button>
+
+          <p style={{ color: '#555', fontSize: '13px', marginTop: '20px', textAlign: 'center' }}>
+            Already have an account?{' '}
+            <a href="/login" style={{ color: '#4ade80', textDecoration: 'none' }}>Log in</a>
+          </p>
         </div>
       </div>
     )
   }
 
-  if (step === 'email') {
-    return (
-      <div style={cardStyle}>
-        <div style={boxStyle}>
-          <div style={{ fontSize: '40px', marginBottom: '16px' }}>✉️</div>
-          <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: '700', margin: '0 0 6px' }}>
-            Almost there
-          </h1>
-          <p style={{ color: '#666', fontSize: '14px', margin: '0 0 32px' }}>
-            Enter your email — we'll send a magic link to finish setup. No password needed.
-          </p>
+  // account step
+  return (
+    <div style={cardStyle}>
+      <div style={boxStyle}>
+        <div style={{ fontSize: '40px', marginBottom: '16px' }}>🔐</div>
+        <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: '700', margin: '0 0 6px' }}>
+          Create your login
+        </h1>
+        <p style={{ color: '#666', fontSize: '14px', margin: '0 0 32px' }}>
+          Pick a username and password. Use these to log in from any device.
+        </p>
 
-          <div style={{ marginBottom: '8px' }}>
-            <label style={labelStyle}>Your email address</label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <label style={labelStyle}>Username</label>
             <input
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={e => { setEmail(e.target.value); setError('') }}
-              onKeyDown={e => e.key === 'Enter' && handleSendMagicLink()}
+              type="text"
+              autoCapitalize="none"
+              placeholder="alis_karahi"
+              value={username}
+              onChange={e => { setUsername(e.target.value); setError('') }}
               style={inputStyle}
             />
           </div>
 
-          {error && <p style={{ color: '#f87171', fontSize: '13px', marginTop: '12px', marginBottom: '0' }}>{error}</p>}
-
-          <button onClick={handleSendMagicLink} disabled={loading} style={primaryBtn(loading)}>
-            {loading ? 'Sending...' : 'Send magic link →'}
-          </button>
-
-          <button
-            onClick={() => { setStep('details'); setError('') }}
-            style={{ background: 'none', border: 'none', color: '#555', fontSize: '13px', cursor: 'pointer', marginTop: '16px', width: '100%' }}
-          >
-            ← Back
-          </button>
+          <div>
+            <label style={labelStyle}>Password</label>
+            <input
+              type="password"
+              placeholder="At least 6 characters"
+              value={password}
+              onChange={e => { setPassword(e.target.value); setError('') }}
+              onKeyDown={e => e.key === 'Enter' && handleCreateAccount()}
+              style={inputStyle}
+            />
+          </div>
         </div>
-      </div>
-    )
-  }
 
-  // sent
-  return (
-    <div style={cardStyle}>
-      <div style={boxStyle}>
-        <div style={{ fontSize: '40px', marginBottom: '16px' }}>📬</div>
-        <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: '700', margin: '0 0 12px' }}>
-          Check your email
-        </h1>
-        <p style={{ color: '#888', fontSize: '15px', lineHeight: '1.6', margin: '0 0 24px' }}>
-          We sent a magic link to <span style={{ color: '#fff' }}>{email}</span>.
-          Click it to finish setting up your business — no password needed.
-        </p>
-        <p style={{ color: '#555', fontSize: '13px', margin: 0 }}>
-          Didn't get it? Check your spam folder or{' '}
-          <span
-            style={{ color: '#4ade80', cursor: 'pointer' }}
-            onClick={() => { setStep('email'); setError('') }}
-          >
-            resend
-          </span>
-          .
-        </p>
+        {error && <p style={{ color: '#f87171', fontSize: '13px', marginTop: '16px', marginBottom: '0' }}>{error}</p>}
+
+        <button onClick={handleCreateAccount} disabled={loading} style={primaryBtn(loading)}>
+          {loading ? 'Creating your business...' : 'Create account & finish →'}
+        </button>
+
+        <button
+          onClick={() => { setStep('details'); setError('') }}
+          style={{ background: 'none', border: 'none', color: '#555', fontSize: '13px', cursor: 'pointer', marginTop: '16px', width: '100%' }}
+        >
+          ← Back
+        </button>
       </div>
     </div>
   )
