@@ -18,49 +18,36 @@ export default function OnboardCallback() {
       handled = true
       setState('creating')
 
-      const pending = localStorage.getItem('pending_business')
+      // localStorage details are a fast path; create-business also falls back to
+      // the server-side pending record (keyed by email) for cross-device links,
+      // and returns the existing business for returning owners (idempotent).
+      let body = {}
+      try {
+        const pending = localStorage.getItem('pending_business')
+        if (pending) body = JSON.parse(pending)
+      } catch { /* ignore */ }
 
-      if (pending) {
-        // New business owner — create the business
-        try {
-          const businessData = JSON.parse(pending)
-          const res = await fetch('/api/onboard/create-business', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify(businessData),
-          })
-          const data = await res.json()
+      try {
+        const res = await fetch('/api/onboard/create-business', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify(body),
+        })
+        const data = await res.json()
 
-          if (!res.ok) {
-            setErrorMsg(data.error || 'Failed to create business')
-            setState('error')
-            return
-          }
-
+        if (res.ok && data.slug) {
           localStorage.removeItem('pending_business')
           router.replace(`/admin/${data.slug}`)
-        } catch {
-          setErrorMsg('Something went wrong. Please try again.')
-          setState('error')
-        }
-      } else {
-        // Returning owner — find their business via the API (service role, reliable)
-        try {
-          const res = await fetch('/api/my-business', {
-            headers: { 'Authorization': `Bearer ${session.access_token}` },
-          })
-          const data = await res.json()
-          if (res.ok && data.slug) {
-            router.replace(`/admin/${data.slug}`)
-          } else {
-            router.replace('/onboard')
-          }
-        } catch {
+        } else {
+          // Authenticated but no business and no pending details → start onboarding
           router.replace('/onboard')
         }
+      } catch {
+        setErrorMsg('Something went wrong. Please try again.')
+        setState('error')
       }
     }
 

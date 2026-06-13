@@ -113,6 +113,23 @@ alter table review_submissions enable row level security;
 create policy "service role full access" on review_submissions for all using (true);
 
 -- ============================================
+-- Pending businesses (onboarding staging, keyed by email)
+-- Lets the magic-link callback create the business on ANY device,
+-- not just the one where the form was filled.
+-- ============================================
+create table if not exists pending_businesses (
+  email text primary key,
+  name text not null,
+  review_url text not null,
+  discount_pct integer not null default 15,
+  phone text,
+  created_at timestamptz default now()
+);
+
+alter table pending_businesses enable row level security;
+create policy "service role full access" on pending_businesses for all using (true);
+
+-- ============================================
 -- Storage bucket for review screenshots
 -- Run in Supabase dashboard > Storage > New bucket:
 --   Name: review-screenshots

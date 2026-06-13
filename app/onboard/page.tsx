@@ -76,13 +76,25 @@ export default function OnboardPage() {
     setLoading(true)
     setError('')
 
-    // Store business details in localStorage so the callback page can create the business
-    localStorage.setItem('pending_business', JSON.stringify({
+    const details = {
       name: businessName.trim(),
       reviewUrl: reviewUrl.trim(),
       discountPct: parseInt(discountPct),
       phone: whatsapp.trim(),
-    }))
+    }
+
+    // Fast path for same-device: localStorage
+    localStorage.setItem('pending_business', JSON.stringify(details))
+
+    // Cross-device path: persist server-side keyed by email so the callback
+    // can create the business even if the link is opened on another device
+    try {
+      await fetch('/api/onboard/save-pending', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...details, email: email.trim().toLowerCase() }),
+      })
+    } catch { /* localStorage fallback still covers same-device */ }
 
     const { error: authError } = await supabase.auth.signInWithOtp({
       email,
