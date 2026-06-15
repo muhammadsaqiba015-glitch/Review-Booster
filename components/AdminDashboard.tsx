@@ -52,6 +52,7 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
   const [savingPin, setSavingPin] = useState(false)
 
   const [copied, setCopied] = useState(false)
+  const [businessError, setBusinessError] = useState('')
 
   const [discountInput, setDiscountInput] = useState('')
   const [savingDiscount, setSavingDiscount] = useState(false)
@@ -111,8 +112,14 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
   async function fetchBusiness() {
     try {
       const res = await fetch(`/api/business/${businessSlug}?t=${Date.now()}`, { headers: await authHeaders(), cache: 'no-store' })
-      if (res.status === 401 || res.status === 403) { router.replace('/login'); return }
+      if (res.status === 401) { router.replace('/login'); return }
       const data = await res.json()
+      if (!res.ok || !data?.id) {
+        console.error('Business load failed:', res.status, data)
+        setBusinessError(data?.error || 'Could not load this business.')
+        return
+      }
+      setBusinessError('')
       setBusiness(data)
       setDiscountInput(String(data.discount_pct ?? ''))
       setReviewLinkInput(data.google_review_url ?? '')
@@ -244,6 +251,12 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
             <LogOut size={15} /> Sign out
           </Button>
         </header>
+
+        {businessError && (
+          <div style={{ background: color.dangerSoft, border: `1px solid ${color.danger}`, borderRadius: radius.md, padding: space[4], marginBottom: space[5], display: 'flex', alignItems: 'center', gap: space[2] }}>
+            <span style={{ ...text.small, color: color.danger }}>{businessError} Try signing out and back in, or check you&apos;re logged into the right account.</span>
+          </div>
+        )}
 
         {/* Redeem panel — primary action */}
         <div style={{
