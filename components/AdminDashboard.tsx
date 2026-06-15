@@ -346,9 +346,20 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
             <Star size={16} color={color.textMuted} />
             <h3 style={{ ...text.h3, color: color.text, margin: 0 }}>Google review link</h3>
           </div>
-          <p style={{ ...text.tiny, fontWeight: 400, color: color.textGhost, margin: `0 0 ${space[4]}`, lineHeight: 1.5 }}>
+          <p style={{ ...text.tiny, fontWeight: 400, color: color.textGhost, margin: `0 0 ${space[3]}`, lineHeight: 1.5 }}>
             Where customers are sent to leave their review. Update it here if it was wrong.
           </p>
+
+          {business?.google_review_url && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: space[2], background: color.bg, border: `1px solid ${color.border}`, borderRadius: radius.sm, padding: `${space[2]} ${space[3]}`, marginBottom: space[3] }}>
+              <span style={{ ...text.tiny, fontWeight: 500, color: color.textMuted, flexShrink: 0 }}>Current:</span>
+              <a href={business.google_review_url} target="_blank" rel="noreferrer"
+                style={{ ...text.tiny, fontWeight: 400, color: color.primary, textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {business.google_review_url}
+              </a>
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: space[3], flexWrap: 'wrap' }}>
             <Input
               type="url" placeholder="https://search.google.com/local/writereview?placeid=…" value={reviewLinkInput}
