@@ -3,146 +3,75 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { usernameToEmail } from '@/lib/username'
+import { CenteredPage, Card, IconBadge, Title, Subtitle, Button, Field, Input, color, space, text } from '@/components/ui'
+import { Lock, ArrowRight } from '@/components/icons'
 
 export default function LoginPage() {
   const router = useRouter()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   async function handleLogin() {
     if (!username.trim()) { setError('Enter your username'); return }
     if (!password) { setError('Enter your password'); return }
-    setLoading(true)
-    setError('')
+    setLoading(true); setError('')
 
     const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email: usernameToEmail(username),
-      password,
+      email: usernameToEmail(username), password,
     })
+    if (authError || !data.session) { setError('Incorrect username or password'); setLoading(false); return }
 
-    if (authError || !data.session) {
-      setError('Incorrect username or password')
-      setLoading(false)
-      return
-    }
-
-    // Find this owner's business
     try {
-      const res = await fetch('/api/my-business', {
-        headers: { 'Authorization': `Bearer ${data.session.access_token}` },
-      })
+      const res = await fetch('/api/my-business', { headers: { 'Authorization': `Bearer ${data.session.access_token}` } })
       const result = await res.json()
-      if (res.ok && result.slug) {
-        router.replace(`/admin/${result.slug}`)
-      } else {
-        router.replace('/onboard')
-      }
+      router.replace(res.ok && result.slug ? `/admin/${result.slug}` : '/onboard')
     } catch {
       router.replace('/onboard')
     }
   }
 
-  const cardStyle: React.CSSProperties = {
-    minHeight: '100vh',
-    background: '#0f0f0f',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '24px',
-    fontFamily: 'system-ui, sans-serif',
-  }
-
-  const boxStyle: React.CSSProperties = {
-    background: '#1a1a1a',
-    borderRadius: '24px',
-    padding: '40px 32px',
-    maxWidth: '380px',
-    width: '100%',
-    textAlign: 'center',
-    border: '1px solid #2a2a2a',
-  }
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '13px 16px',
-    borderRadius: '12px',
-    border: '1px solid #333',
-    background: '#0f0f0f',
-    color: '#fff',
-    fontSize: '15px',
-    outline: 'none',
-    boxSizing: 'border-box',
-  }
-
   return (
-    <div style={cardStyle}>
-      <div style={boxStyle}>
-        <div style={{ fontSize: '40px', marginBottom: '16px' }}>🔑</div>
-        <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: '700', margin: '0 0 8px' }}>
-          Owner login
-        </h1>
-        <p style={{ color: '#666', fontSize: '14px', margin: '0 0 32px' }}>
-          Log in with your username and password.
-        </p>
-
-        <div style={{ marginBottom: '14px', textAlign: 'left' }}>
-          <label style={{ color: '#aaa', fontSize: '13px', display: 'block', marginBottom: '8px' }}>
-            Username
-          </label>
-          <input
-            type="text"
-            autoCapitalize="none"
-            placeholder="alis_karahi"
-            value={username}
-            onChange={e => { setUsername(e.target.value); setError('') }}
-            style={inputStyle}
-          />
+    <CenteredPage>
+      <Card className="rb-fade-up">
+        <div style={{ textAlign: 'center', marginBottom: space[7] }}>
+          <IconBadge><Lock size={24} /></IconBadge>
+          <Title style={{ marginTop: space[5] }}>Owner login</Title>
+          <Subtitle style={{ marginTop: space[2], ...text.small }}>Log in with your username and password.</Subtitle>
         </div>
 
-        <div style={{ marginBottom: '8px', textAlign: 'left' }}>
-          <label style={{ color: '#aaa', fontSize: '13px', display: 'block', marginBottom: '8px' }}>
-            Password
-          </label>
-          <input
-            type="password"
-            placeholder="Your password"
-            value={password}
-            onChange={e => { setPassword(e.target.value); setError('') }}
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
-            style={inputStyle}
-          />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: space[4] }}>
+          <Field label="Username">
+            <Input autoCapitalize="none" placeholder="alis_karahi" value={username}
+              onChange={e => { setUsername(e.target.value); setError('') }} />
+          </Field>
+          <Field label="Password">
+            <div style={{ position: 'relative' }}>
+              <Input type={showPassword ? 'text' : 'password'} placeholder="Your password" value={password}
+                onChange={e => { setPassword(e.target.value); setError('') }}
+                onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                style={{ paddingRight: '60px' }} />
+              <button type="button" onClick={() => setShowPassword(v => !v)}
+                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: color.primary, ...text.tiny, fontWeight: 600, cursor: 'pointer', padding: space[1] }}>
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
+          </Field>
         </div>
 
-        {error && <p style={{ color: '#f87171', fontSize: '13px', marginTop: '12px', textAlign: 'left' }}>{error}</p>}
+        {error && <p style={{ ...text.small, color: color.danger, margin: `${space[4]} 0 0`, textAlign: 'center' }}>{error}</p>}
 
-        <button
-          onClick={handleLogin}
-          disabled={loading}
-          style={{
-            width: '100%',
-            padding: '15px',
-            borderRadius: '12px',
-            border: 'none',
-            background: loading ? '#333' : '#4ade80',
-            color: loading ? '#888' : '#0f0f0f',
-            fontSize: '15px',
-            fontWeight: '600',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            marginTop: '12px',
-          }}
-        >
-          {loading ? 'Logging in...' : 'Log in →'}
-        </button>
-
-        <p style={{ color: '#555', fontSize: '13px', marginTop: '24px' }}>
-          New business?{' '}
-          <a href="/onboard" style={{ color: '#4ade80', textDecoration: 'none' }}>
-            Get started here
-          </a>
+        <div style={{ marginTop: space[6] }}>
+          <Button onClick={handleLogin} loading={loading}>
+            {loading ? 'Logging in…' : <>Log in <ArrowRight size={18} /></>}
+          </Button>
+        </div>
+        <p style={{ ...text.small, color: color.textFaint, marginTop: space[5], textAlign: 'center' }}>
+          New business? <a href="/onboard" style={{ color: color.primary, textDecoration: 'none', fontWeight: 500 }}>Get started</a>
         </p>
-      </div>
-    </div>
+      </Card>
+    </CenteredPage>
   )
 }

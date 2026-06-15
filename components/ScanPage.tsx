@@ -1,5 +1,7 @@
 'use client'
 import { useState, useRef } from 'react'
+import { CenteredPage, Card, IconBadge, Title, Subtitle, Button, Field, Input, color, radius, space, text, shadow } from '@/components/ui'
+import { Star, Pencil, Camera, Gift, ArrowRight, Image as ImageIcon, Check, Phone } from '@/components/icons'
 
 interface Props {
   business: {
@@ -12,6 +14,24 @@ interface Props {
 }
 
 type Step = 'form' | 'reviewing' | 'uploading' | 'coupon'
+const STEP_INDEX: Record<Step, number> = { form: 0, reviewing: 1, uploading: 2, coupon: 3 }
+
+function Stepper({ current }: { current: Step }) {
+  const idx = STEP_INDEX[current]
+  return (
+    <div style={{ display: 'flex', gap: space[2], justifyContent: 'center', marginBottom: space[6] }}>
+      {[0, 1, 2, 3].map(i => (
+        <div key={i} style={{
+          height: '4px',
+          width: i === idx ? '28px' : '8px',
+          borderRadius: radius.pill,
+          background: i <= idx ? color.primary : color.border,
+          transition: 'all 240ms cubic-bezier(0.4,0,0.2,1)',
+        }} />
+      ))}
+    </div>
+  )
+}
 
 export default function ScanPage({ business }: Props) {
   const [name, setName] = useState('')
@@ -28,89 +48,17 @@ export default function ScanPage({ business }: Props) {
   const [coupon, setCoupon] = useState<{ code: string; discountPct: number; businessName: string; expiresAt: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const cardStyle: React.CSSProperties = {
-    minHeight: '100vh',
-    background: '#0f0f0f',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '24px',
-    fontFamily: 'system-ui, sans-serif',
-  }
-
-  const boxStyle: React.CSSProperties = {
-    background: '#1a1a1a',
-    borderRadius: '24px',
-    padding: '40px 32px',
-    maxWidth: '380px',
-    width: '100%',
-    textAlign: 'center',
-    border: '1px solid #2a2a2a',
-  }
-
-  function inputStyle(hasError: boolean): React.CSSProperties {
-    return {
-      width: '100%',
-      padding: '14px 16px',
-      borderRadius: '12px',
-      border: `1px solid ${hasError ? '#f87171' : '#333'}`,
-      background: '#0f0f0f',
-      color: '#fff',
-      fontSize: '16px',
-      outline: 'none',
-      boxSizing: 'border-box',
-    }
-  }
-
-  const primaryBtn = (disabled = false): React.CSSProperties => ({
-    width: '100%',
-    padding: '16px',
-    borderRadius: '12px',
-    border: 'none',
-    background: disabled ? '#333' : '#4ade80',
-    color: disabled ? '#888' : '#0f0f0f',
-    fontSize: '16px',
-    fontWeight: '600',
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    transition: 'all 0.2s',
-  })
-
-  const ghostBtn: React.CSSProperties = {
-    width: '100%',
-    padding: '14px',
-    borderRadius: '12px',
-    border: '1px solid #333',
-    background: 'transparent',
-    color: '#888',
-    fontSize: '14px',
-    cursor: 'pointer',
-  }
-
   function validateForm() {
-    let valid = true
-    if (!name || name.trim().length < 2) {
-      setNameError('Please enter your name')
-      valid = false
-    } else {
-      setNameError('')
-    }
-    if (!phone || phone.replace(/\D/g, '').length < 10) {
-      setPhoneError('Please enter a valid phone number')
-      valid = false
-    } else {
-      setPhoneError('')
-    }
-    return valid
+    let ok = true
+    if (!name || name.trim().length < 2) { setNameError('Please enter your name'); ok = false } else setNameError('')
+    if (!phone || phone.replace(/\D/g, '').length < 10) { setPhoneError('Enter a valid phone number'); ok = false } else setPhoneError('')
+    return ok
   }
 
   async function handleFormSubmit() {
     if (!validateForm()) return
-
-    // Open review page immediately — must happen before any await or mobile browsers block it
-    window.open(business.google_review_url, '_blank')
-
-    setLoading(true)
-    setError('')
+    window.open(business.google_review_url, '_blank') // sync open before await (mobile popup rule)
+    setLoading(true); setError('')
     try {
       const res = await fetch('/api/submission', {
         method: 'POST',
@@ -123,23 +71,18 @@ export default function ScanPage({ business }: Props) {
       setStep('reviewing')
     } catch {
       setError('Something went wrong. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    setScreenshot(file)
-    setPreviewUrl(URL.createObjectURL(file))
-    setUploadError('')
+    setScreenshot(file); setPreviewUrl(URL.createObjectURL(file)); setUploadError('')
   }
 
   async function handleClaimCoupon() {
     if (!screenshot) { setUploadError('Please upload a screenshot of your review'); return }
-    setLoading(true)
-    setUploadError('')
+    setLoading(true); setUploadError('')
     try {
       const formData = new FormData()
       formData.append('submissionId', submissionId)
@@ -147,120 +90,97 @@ export default function ScanPage({ business }: Props) {
       const res = await fetch('/api/submission/claim-coupon', { method: 'POST', body: formData })
       const data = await res.json()
       if (!res.ok) { setUploadError(data.error || 'Something went wrong'); setLoading(false); return }
-      setCoupon({
-        code: data.couponCode,
-        discountPct: data.discountPct,
-        businessName: data.businessName,
-        expiresAt: data.expiresAt,
-      })
+      setCoupon({ code: data.couponCode, discountPct: data.discountPct, businessName: data.businessName, expiresAt: data.expiresAt })
       setStep('coupon')
     } catch {
       setUploadError('Something went wrong. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
-  // Step 1: Form
+  /* ---------- Step 1: form ---------- */
   if (step === 'form') {
     return (
-      <div style={cardStyle}>
-        <div style={boxStyle}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⭐</div>
-          <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: '600', margin: '0 0 8px' }}>
-            Review {business.name}
-          </h1>
-          <p style={{ color: '#888', fontSize: '15px', margin: '0 0 32px', lineHeight: '1.5' }}>
-            Leave us a Google review and get{' '}
-            <span style={{ color: '#4ade80', fontWeight: '600' }}>{business.discount_pct}% off</span>{' '}
-            your next visit
-          </p>
-
-          <div style={{ marginBottom: '16px', textAlign: 'left' }}>
-            <label style={{ color: '#aaa', fontSize: '13px', display: 'block', marginBottom: '8px' }}>Your name</label>
-            <input
-              type="text"
-              placeholder="Ali Hassan"
-              value={name}
-              onChange={e => { setName(e.target.value); setNameError('') }}
-              style={inputStyle(!!nameError)}
-            />
-            {nameError && <p style={{ color: '#f87171', fontSize: '12px', margin: '6px 0 0' }}>{nameError}</p>}
+      <CenteredPage>
+        <Card className="rb-fade-up">
+          <Stepper current={step} />
+          <div style={{ textAlign: 'center' }}>
+            <IconBadge><Star size={26} /></IconBadge>
+            <Title style={{ marginTop: space[5], ...text.h1 }}>Review {business.name}</Title>
+            <Subtitle style={{ marginTop: space[2], marginBottom: space[7] }}>
+              Leave a quick Google review and get{' '}
+              <span style={{ color: color.primary, fontWeight: 600 }}>{business.discount_pct}% off</span> your next visit.
+            </Subtitle>
           </div>
 
-          <div style={{ marginBottom: '24px', textAlign: 'left' }}>
-            <label style={{ color: '#aaa', fontSize: '13px', display: 'block', marginBottom: '8px' }}>Your WhatsApp number</label>
-            <input
-              type="tel"
-              placeholder="03XX-XXXXXXX"
-              value={phone}
-              onChange={e => { setPhone(e.target.value); setPhoneError('') }}
-              onKeyDown={e => e.key === 'Enter' && handleFormSubmit()}
-              style={inputStyle(!!phoneError)}
-            />
-            {phoneError && <p style={{ color: '#f87171', fontSize: '12px', margin: '6px 0 0' }}>{phoneError}</p>}
-            <p style={{ color: '#555', fontSize: '12px', margin: '6px 0 0' }}>
-              Your coupon link will be sent here
-            </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: space[4] }}>
+            <Field label="Your name" error={nameError}>
+              <Input placeholder="Ali Hassan" value={name} invalid={!!nameError}
+                onChange={e => { setName(e.target.value); setNameError('') }} />
+            </Field>
+            <Field label="Your WhatsApp number" hint="Your coupon link is sent here" error={phoneError}>
+              <Input type="tel" inputMode="tel" placeholder="03XX-XXXXXXX" value={phone} invalid={!!phoneError}
+                onChange={e => { setPhone(e.target.value); setPhoneError('') }}
+                onKeyDown={e => e.key === 'Enter' && handleFormSubmit()} />
+            </Field>
           </div>
 
-          {error && <p style={{ color: '#f87171', fontSize: '13px', margin: '0 0 16px' }}>{error}</p>}
+          {error && <p style={{ ...text.small, color: color.danger, margin: `${space[4]} 0 0`, textAlign: 'center' }}>{error}</p>}
 
-          <button onClick={handleFormSubmit} disabled={loading} style={primaryBtn(loading)}>
-            {loading ? 'Submitting...' : 'Leave a Review →'}
-          </button>
-        </div>
-      </div>
+          <div style={{ marginTop: space[6] }}>
+            <Button onClick={handleFormSubmit} loading={loading}>
+              {loading ? 'Opening Google…' : <>Leave a Review <ArrowRight size={18} /></>}
+            </Button>
+          </div>
+        </Card>
+      </CenteredPage>
     )
   }
 
-  // Step 2: Reviewing
+  /* ---------- Step 2: reviewing ---------- */
   if (step === 'reviewing') {
     return (
-      <div style={cardStyle}>
-        <div style={boxStyle}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>📝</div>
-          <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: '600', margin: '0 0 12px' }}>
-            Leave your review
-          </h1>
-          <p style={{ color: '#888', fontSize: '15px', margin: '0 0 24px', lineHeight: '1.6' }}>
-            Write your review on Google, then come back here and upload a screenshot to claim your coupon.
-          </p>
-          <button onClick={() => setStep('uploading')} style={primaryBtn()}>
-            I've posted my review →
-          </button>
-          <div style={{ marginTop: '12px' }}>
-            <button onClick={() => window.open(business.google_review_url, '_blank')} style={ghostBtn}>
-              Reopen Google review →
-            </button>
+      <CenteredPage>
+        <Card className="rb-fade-up">
+          <Stepper current={step} />
+          <div style={{ textAlign: 'center' }}>
+            <IconBadge><Pencil size={24} /></IconBadge>
+            <Title style={{ marginTop: space[5] }}>Write your review</Title>
+            <Subtitle style={{ marginTop: space[2], marginBottom: space[6] }}>
+              Post your review on Google, then come back and upload a screenshot to claim your reward.
+            </Subtitle>
           </div>
-        </div>
-      </div>
+          <Button onClick={() => setStep('uploading')}>I&apos;ve posted my review <ArrowRight size={18} /></Button>
+          <div style={{ marginTop: space[3] }}>
+            <Button variant="ghost" onClick={() => window.open(business.google_review_url, '_blank')}>
+              Reopen Google review
+            </Button>
+          </div>
+        </Card>
+      </CenteredPage>
     )
   }
 
-  // Step 3: Upload screenshot
+  /* ---------- Step 3: upload ---------- */
   if (step === 'uploading') {
     return (
-      <div style={cardStyle}>
-        <div style={boxStyle}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>📸</div>
-          <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: '600', margin: '0 0 8px' }}>
-            Upload your screenshot
-          </h1>
+      <CenteredPage>
+        <Card className="rb-fade-up">
+          <Stepper current={step} />
+          <div style={{ textAlign: 'center' }}>
+            <IconBadge><Camera size={24} /></IconBadge>
+            <Title style={{ marginTop: space[5] }}>Upload your screenshot</Title>
+            <Subtitle style={{ marginTop: space[2], marginBottom: space[5], ...text.small }}>
+              Snap your posted Google review so we can verify it.
+            </Subtitle>
+          </div>
 
-          {/* Step-by-step instructions */}
-          <div style={{ background: '#111', borderRadius: '12px', padding: '16px', marginBottom: '20px', textAlign: 'left' }}>
-            <p style={{ color: '#666', fontSize: '12px', margin: '0 0 10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>How to get screenshot</p>
-            {[
-              'Go to Google Maps on your phone',
-              'Find your review you just posted',
-              'Take a screenshot showing your name + review',
-              'Upload it below',
-            ].map((step, i) => (
-              <div key={i} style={{ display: 'flex', gap: '10px', marginBottom: i < 3 ? '8px' : '0', alignItems: 'flex-start' }}>
-                <span style={{ color: '#4ade80', fontSize: '13px', fontWeight: '700', minWidth: '18px' }}>{i + 1}.</span>
-                <span style={{ color: '#888', fontSize: '13px', lineHeight: '1.4' }}>{step}</span>
+          {/* Instructions */}
+          <div style={{ background: color.bg, border: `1px solid ${color.border}`, borderRadius: radius.md, padding: space[4], marginBottom: space[5] }}>
+            <p style={{ ...text.tiny, color: color.textGhost, textTransform: 'uppercase', letterSpacing: '0.06em', margin: `0 0 ${space[3]}` }}>How to get it</p>
+            {['Open Google Maps and find your review', 'Take a screenshot showing your name + review', 'Upload it below'].map((s, i) => (
+              <div key={i} style={{ display: 'flex', gap: space[3], marginBottom: i < 2 ? space[2] : 0, alignItems: 'flex-start' }}>
+                <span style={{ ...text.tiny, color: color.primary, fontWeight: 700, minWidth: '16px' }}>{i + 1}</span>
+                <span style={{ ...text.small, color: color.textMuted }}>{s}</span>
               </div>
             ))}
           </div>
@@ -268,115 +188,90 @@ export default function ScanPage({ business }: Props) {
           <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} style={{ display: 'none' }} />
 
           {previewUrl ? (
-            <div style={{ marginBottom: '20px' }}>
-              <img
-                src={previewUrl}
-                alt="Review screenshot"
-                style={{ width: '100%', borderRadius: '12px', border: '1px solid #333', maxHeight: '200px', objectFit: 'cover' }}
-              />
-              <button
-                onClick={() => { setScreenshot(null); setPreviewUrl(null) }}
-                style={{ ...ghostBtn, marginTop: '8px', padding: '8px 16px', width: 'auto' }}
-              >
-                Remove
+            <div style={{ marginBottom: space[5] }}>
+              <img src={previewUrl} alt="Your review screenshot"
+                style={{ width: '100%', borderRadius: radius.md, border: `1px solid ${color.border}`, maxHeight: '200px', objectFit: 'cover', display: 'block' }} />
+              <button onClick={() => { setScreenshot(null); setPreviewUrl(null) }}
+                style={{ marginTop: space[2], background: 'none', border: 'none', color: color.textMuted, ...text.small, cursor: 'pointer', padding: space[1] }}>
+                Remove & choose another
               </button>
             </div>
           ) : (
-            <button
-              onClick={() => fileInputRef.current?.click()}
+            <button onClick={() => fileInputRef.current?.click()}
               style={{
-                width: '100%',
-                padding: '28px 16px',
-                borderRadius: '12px',
-                border: '2px dashed #333',
-                background: 'transparent',
-                color: '#555',
-                fontSize: '14px',
-                cursor: 'pointer',
-                marginBottom: '20px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <span style={{ fontSize: '28px' }}>🖼️</span>
-              <span>Tap to select screenshot</span>
+                width: '100%', padding: `${space[7]} ${space[4]}`, borderRadius: radius.md,
+                border: `1.5px dashed ${color.borderStrong}`, background: color.bg, color: color.textFaint,
+                cursor: 'pointer', marginBottom: space[5], display: 'flex', flexDirection: 'column',
+                alignItems: 'center', gap: space[2], transition: 'border-color 160ms',
+              }}>
+              <ImageIcon size={28} color={color.textFaint} />
+              <span style={{ ...text.small }}>Tap to select screenshot</span>
             </button>
           )}
 
-          {uploadError && <p style={{ color: '#f87171', fontSize: '13px', margin: '0 0 16px' }}>{uploadError}</p>}
+          {uploadError && <p style={{ ...text.small, color: color.danger, margin: `0 0 ${space[4]}`, textAlign: 'center' }}>{uploadError}</p>}
 
-          <button onClick={handleClaimCoupon} disabled={loading || !screenshot} style={primaryBtn(loading || !screenshot)}>
-            {loading ? 'Verifying...' : 'Get My Coupon →'}
-          </button>
-        </div>
-      </div>
+          <Button onClick={handleClaimCoupon} loading={loading} disabled={!screenshot}>
+            {loading ? 'Verifying…' : <>Get My Coupon <ArrowRight size={18} /></>}
+          </Button>
+        </Card>
+      </CenteredPage>
     )
   }
 
-  // Step 4: Coupon
+  /* ---------- Step 4: coupon reveal ---------- */
   if (step === 'coupon' && coupon) {
-    const expiryDate = coupon.expiresAt
+    const expiry = coupon.expiresAt
       ? new Date(coupon.expiresAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' })
       : null
-
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: '#16a34a',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px',
-        fontFamily: 'system-ui, sans-serif',
-      }}>
-        <div style={{
-          background: 'rgba(255,255,255,0.12)',
-          borderRadius: '28px',
-          padding: '40px 32px',
-          maxWidth: '380px',
-          width: '100%',
-          textAlign: 'center',
-          border: '1px solid rgba(255,255,255,0.2)',
+      <CenteredPage>
+        <Card className="rb-pop" style={{
+          background: `linear-gradient(165deg, rgba(52,211,153,0.10), ${color.surface} 45%)`,
+          border: `1px solid ${color.primaryBorder}`,
+          boxShadow: shadow.glow,
         }}>
-          <div style={{ fontSize: '64px', marginBottom: '16px' }}>🎉</div>
-          <h1 style={{ color: '#fff', fontSize: '26px', fontWeight: '700', margin: '0 0 4px' }}>
-            Here's your coupon!
-          </h1>
-          <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '14px', margin: '0 0 20px' }}>
-            Thank you for reviewing {coupon.businessName}
-          </p>
+          <div style={{ textAlign: 'center' }}>
+            <IconBadge><Gift size={26} /></IconBadge>
+            <Title style={{ marginTop: space[5] }}>Here&apos;s your reward</Title>
+            <Subtitle style={{ marginTop: space[2], marginBottom: space[6], ...text.small }}>
+              Thank you for reviewing {coupon.businessName}
+            </Subtitle>
 
-          <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: '16px', padding: '20px', marginBottom: '16px' }}>
-            <p style={{ color: '#fff', fontSize: '48px', fontWeight: '800', margin: '0 0 4px', letterSpacing: '-1px' }}>
-              {coupon.discountPct}% OFF
-            </p>
-            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', margin: 0 }}>your next visit</p>
+            {/* Discount hero */}
+            <div style={{ background: color.bg, border: `1px solid ${color.border}`, borderRadius: radius.lg, padding: `${space[6]} ${space[4]}`, marginBottom: space[4] }}>
+              <div className="tnum" style={{ fontSize: '52px', fontWeight: 700, color: color.primary, lineHeight: 1, letterSpacing: '-0.03em' }}>
+                {coupon.discountPct}% OFF
+              </div>
+              <p style={{ ...text.small, color: color.textMuted, margin: `${space[2]} 0 0` }}>your next visit</p>
+            </div>
+
+            {/* Code */}
+            <div style={{ marginBottom: space[4] }}>
+              <p style={{ ...text.tiny, color: color.textGhost, textTransform: 'uppercase', letterSpacing: '0.08em', margin: `0 0 ${space[2]}` }}>Coupon code</p>
+              <div className="tnum" style={{
+                fontFamily: 'ui-monospace, monospace', fontSize: '26px', fontWeight: 700, color: color.text,
+                letterSpacing: '0.18em', background: color.surfaceRaised, border: `1px dashed ${color.borderStrong}`,
+                borderRadius: radius.md, padding: `${space[3]} ${space[4]}`,
+              }}>
+                {coupon.code}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: space[2], color: color.textMuted, ...text.small, marginBottom: space[1] }}>
+              <Check size={16} color={color.primary} /> Show this screen to staff before billing
+            </div>
+            {expiry && <p style={{ ...text.tiny, color: color.textGhost, fontWeight: 400, margin: 0 }}>Valid until {expiry}</p>}
+
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: space[2], textAlign: 'left', background: color.bg, border: `1px solid ${color.border}`, borderRadius: radius.md, padding: space[3], marginTop: space[5] }}>
+              <Phone size={16} color={color.textMuted} style={{ flexShrink: 0, marginTop: '2px' }} />
+              <span style={{ ...text.tiny, fontWeight: 400, color: color.textMuted }}>
+                We&apos;ve sent your coupon link to WhatsApp — save it to use later.
+              </span>
+            </div>
           </div>
-
-          <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '12px', padding: '14px 20px', marginBottom: '16px', display: 'inline-block' }}>
-            <span style={{ color: '#fff', fontSize: '26px', fontWeight: '700', letterSpacing: '4px', fontFamily: 'monospace' }}>
-              {coupon.code}
-            </span>
-          </div>
-
-          <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', fontWeight: '600', margin: '0 0 4px' }}>
-            Show this screen to staff before your bill
-          </p>
-          {expiryDate && (
-            <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '12px', margin: '0 0 16px' }}>
-              Valid until {expiryDate}
-            </p>
-          )}
-
-          <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '12px', padding: '12px 16px' }}>
-            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', margin: 0, lineHeight: '1.5' }}>
-              📱 Your coupon link has been sent to your WhatsApp. Save it to use later.
-            </p>
-          </div>
-        </div>
-      </div>
+        </Card>
+      </CenteredPage>
     )
   }
 

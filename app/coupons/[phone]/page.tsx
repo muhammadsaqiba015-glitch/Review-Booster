@@ -1,17 +1,15 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { color, radius, space, text } from '@/components/ui'
+import { Ticket, ArrowRight, XCircle, Check } from '@/components/icons'
 
 interface Coupon {
   code: string
   status: 'active' | 'redeemed' | 'expired' | 'pending'
   expires_at: string | null
   activated_at: string | null
-  businesses: {
-    name: string
-    discount_pct: number
-    slug: string
-  }
+  businesses: { name: string; discount_pct: number; slug: string }
 }
 
 export default function CouponWallet() {
@@ -27,134 +25,79 @@ export default function CouponWallet() {
       .catch(() => setLoading(false))
   }, [phone])
 
-  const cardStyle: React.CSSProperties = {
-    minHeight: '100vh',
-    background: '#0f0f0f',
-    padding: '32px 20px',
-    fontFamily: 'system-ui, sans-serif',
-  }
-
-  function statusColor(status: string) {
-    if (status === 'active') return '#4ade80'
-    if (status === 'redeemed') return '#888'
-    return '#f87171'
-  }
-
-  function statusLabel(status: string) {
-    if (status === 'active') return '✅ Valid'
-    if (status === 'redeemed') return '✓ Used'
-    if (status === 'expired') return '✗ Expired'
-    return '⏳ Pending'
-  }
-
-  function formatDate(date: string | null) {
-    if (!date) return null
-    return new Date(date).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })
-  }
-
-  const activeCoupons = coupons.filter(c => c.status === 'active')
-  const usedCoupons = coupons.filter(c => c.status !== 'active')
+  const fmt = (d: string | null) => d ? new Date(d).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' }) : null
+  const active = coupons.filter(c => c.status === 'active')
+  const past = coupons.filter(c => c.status !== 'active')
 
   return (
-    <div style={cardStyle}>
-      <div style={{ maxWidth: '420px', margin: '0 auto' }}>
-        <div style={{ marginBottom: '32px' }}>
-          <h1 style={{ color: '#fff', fontSize: '24px', fontWeight: '700', margin: '0 0 4px' }}>
-            My Coupons
-          </h1>
-          <p style={{ color: '#555', fontSize: '14px', margin: 0 }}>
-            All your review rewards in one place
-          </p>
-        </div>
+    <div style={{ minHeight: '100dvh', background: color.bg, padding: `${space[8]} ${space[5]}`, fontFamily: 'var(--font-sans), system-ui' }}>
+      <div style={{ maxWidth: '440px', margin: '0 auto' }}>
+        <header style={{ marginBottom: space[7] }}>
+          <h1 style={{ ...text.h1, color: color.text, margin: `0 0 ${space[1]}` }}>My Coupons</h1>
+          <p style={{ ...text.small, color: color.textFaint, margin: 0 }}>All your review rewards in one place</p>
+        </header>
 
         {loading ? (
-          <p style={{ color: '#555', textAlign: 'center', padding: '40px 0' }}>Loading...</p>
+          <p style={{ ...text.small, color: color.textFaint, textAlign: 'center', padding: `${space[8]} 0` }}>Loading…</p>
         ) : coupons.length === 0 ? (
-          <div style={{ background: '#1a1a1a', borderRadius: '16px', padding: '48px 24px', textAlign: 'center', border: '1px solid #2a2a2a' }}>
-            <div style={{ fontSize: '40px', marginBottom: '12px' }}>🎟️</div>
-            <p style={{ color: '#666', fontSize: '14px', margin: 0 }}>No coupons yet. Leave a review at a business to earn one.</p>
+          <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.lg, padding: `${space[9]} ${space[6]}`, textAlign: 'center' }}>
+            <div style={{ display: 'inline-flex', marginBottom: space[3], color: color.textFaint }}><Ticket size={32} /></div>
+            <p style={{ ...text.small, color: color.textMuted, margin: 0 }}>No coupons yet. Leave a review at a business to earn one.</p>
           </div>
         ) : (
           <>
-            {activeCoupons.length > 0 && (
-              <div style={{ marginBottom: '32px' }}>
-                <p style={{ color: '#4ade80', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 12px' }}>
-                  Active — {activeCoupons.length}
+            {active.length > 0 && (
+              <section style={{ marginBottom: space[8] }}>
+                <p style={{ ...text.tiny, color: color.primary, textTransform: 'uppercase', letterSpacing: '0.08em', margin: `0 0 ${space[3]}` }}>
+                  Active — {active.length}
                 </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {activeCoupons.map(c => (
-                    <a
-                      key={c.code}
-                      href={`/coupon/${c.code}`}
-                      style={{ textDecoration: 'none' }}
-                    >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: space[3] }}>
+                  {active.map(c => (
+                    <a key={c.code} href={`/coupon/${c.code}`} style={{ textDecoration: 'none' }}>
                       <div style={{
-                        background: '#1a1a1a',
-                        border: '1px solid #2d4a2d',
-                        borderRadius: '16px',
-                        padding: '20px',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
+                        background: `linear-gradient(135deg, rgba(52,211,153,0.08), ${color.surface} 60%)`,
+                        border: `1px solid ${color.primaryBorder}`, borderRadius: radius.lg, padding: space[5],
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: space[4],
                       }}>
                         <div>
-                          <p style={{ color: '#fff', fontSize: '16px', fontWeight: '600', margin: '0 0 4px' }}>
-                            {c.businesses.name}
-                          </p>
-                          <p style={{ color: '#4ade80', fontSize: '24px', fontWeight: '800', margin: '0 0 4px' }}>
+                          <p style={{ ...text.h3, color: color.text, margin: `0 0 ${space[1]}` }}>{c.businesses.name}</p>
+                          <p className="tnum" style={{ fontSize: '24px', fontWeight: 700, color: color.primary, margin: `0 0 ${space[1]}`, letterSpacing: '-0.02em' }}>
                             {c.businesses.discount_pct}% OFF
                           </p>
-                          <p style={{ color: '#555', fontSize: '12px', margin: 0, fontFamily: 'monospace', letterSpacing: '2px' }}>
-                            {c.code}
+                          <p className="tnum" style={{ ...text.tiny, fontFamily: 'ui-monospace, monospace', color: color.textFaint, letterSpacing: '0.12em', margin: 0 }}>
+                            {c.code}{c.expires_at ? ` · exp ${fmt(c.expires_at)}` : ''}
                           </p>
-                          {c.expires_at && (
-                            <p style={{ color: '#555', fontSize: '11px', margin: '4px 0 0' }}>
-                              Expires {formatDate(c.expires_at)}
-                            </p>
-                          )}
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <span style={{ color: '#4ade80', fontSize: '13px', fontWeight: '600' }}>Tap to open →</span>
-                        </div>
+                        <ArrowRight size={20} color={color.primary} />
                       </div>
                     </a>
                   ))}
                 </div>
-              </div>
+              </section>
             )}
 
-            {usedCoupons.length > 0 && (
-              <div>
-                <p style={{ color: '#444', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 12px' }}>
-                  Past — {usedCoupons.length}
+            {past.length > 0 && (
+              <section>
+                <p style={{ ...text.tiny, color: color.textGhost, textTransform: 'uppercase', letterSpacing: '0.08em', margin: `0 0 ${space[3]}` }}>
+                  Past — {past.length}
                 </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {usedCoupons.map(c => (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: space[2] }}>
+                  {past.map(c => (
                     <div key={c.code} style={{
-                      background: '#141414',
-                      border: '1px solid #2a2a2a',
-                      borderRadius: '12px',
-                      padding: '16px 20px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      opacity: 0.6,
+                      background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.md,
+                      padding: `${space[4]} ${space[5]}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: 0.7,
                     }}>
                       <div>
-                        <p style={{ color: '#888', fontSize: '14px', fontWeight: '600', margin: '0 0 2px' }}>
-                          {c.businesses.name}
-                        </p>
-                        <p style={{ color: '#666', fontSize: '12px', margin: 0, fontFamily: 'monospace', letterSpacing: '2px' }}>
-                          {c.code}
-                        </p>
+                        <p style={{ ...text.small, fontWeight: 600, color: color.textMuted, margin: `0 0 2px` }}>{c.businesses.name}</p>
+                        <p className="tnum" style={{ ...text.tiny, fontFamily: 'ui-monospace, monospace', color: color.textGhost, letterSpacing: '0.12em', margin: 0 }}>{c.code}</p>
                       </div>
-                      <span style={{ color: statusColor(c.status), fontSize: '12px', fontWeight: '600' }}>
-                        {statusLabel(c.status)}
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: space[1], ...text.tiny, color: c.status === 'redeemed' ? color.textMuted : color.danger }}>
+                        {c.status === 'redeemed' ? <><Check size={14} /> Used</> : <><XCircle size={14} /> Expired</>}
                       </span>
                     </div>
                   ))}
                 </div>
-              </div>
+              </section>
             )}
           </>
         )}

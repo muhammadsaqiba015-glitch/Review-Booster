@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
 import type { Session } from '@supabase/supabase-js'
+import { color, radius, space, text, shadow, Button, Input } from '@/components/ui'
+import { Ticket, Lock, Copy, Check, LogOut, Download, Refresh, Gift, Sparkles, Store } from '@/components/icons'
 
 interface Submission {
   id: string
@@ -40,19 +42,21 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
   const [lastSync, setLastSync] = useState('')
   const [qrDataUrl, setQrDataUrl] = useState('')
 
-  // Redeem coupon (admin)
   const [redeemCode, setRedeemCode] = useState('')
   const [redeemResult, setRedeemResult] = useState<{ success?: boolean; message?: string; error?: string } | null>(null)
   const [redeeming, setRedeeming] = useState(false)
 
-  // PIN setup
   const [pin, setPin] = useState('')
   const [pinSaved, setPinSaved] = useState(false)
   const [pinError, setPinError] = useState('')
   const [savingPin, setSavingPin] = useState(false)
 
-  // Review link copy
   const [copied, setCopied] = useState(false)
+
+  const [discountInput, setDiscountInput] = useState('')
+  const [savingDiscount, setSavingDiscount] = useState(false)
+  const [discountSaved, setDiscountSaved] = useState(false)
+  const [discountError, setDiscountError] = useState('')
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -63,14 +67,13 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
     })
   }, [router])
 
-  useEffect(() => {
-    if (session) sessionRef.current = session
-  }, [session])
+  useEffect(() => { if (session) sessionRef.current = session }, [session])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      QRCode.toDataURL(`${window.location.origin}/r/${businessSlug}`, { width: 240, margin: 2 })
-        .then(setQrDataUrl)
+      QRCode.toDataURL(`${window.location.origin}/r/${businessSlug}`, {
+        width: 320, margin: 1, color: { dark: '#0A0A0B', light: '#FFFFFF' },
+      }).then(setQrDataUrl)
     }
   }, [businessSlug])
 
@@ -83,13 +86,9 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
     if (!business) return
     fetchSubmissions()
     const interval = setInterval(() => fetchSubmissions(), 10000)
-
-    // Refetch the moment the tab regains focus / visibility (timers freeze in
-    // background tabs, so this catches up instantly when you come back).
     const onVisible = () => { if (document.visibilityState === 'visible') fetchSubmissions() }
     document.addEventListener('visibilitychange', onVisible)
     window.addEventListener('focus', onVisible)
-
     return () => {
       clearInterval(interval)
       document.removeEventListener('visibilitychange', onVisible)
@@ -98,94 +97,85 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [business?.id])
 
-  // Always pull a fresh token — Supabase auto-refreshes it under the hood,
-  // so this never goes stale even if the tab stays open for hours.
   async function authHeaders() {
     const { data: { session } } = await supabase.auth.getSession()
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session?.access_token ?? ''}`,
-    }
+    return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token ?? ''}` }
   }
 
   async function fetchBusiness() {
     try {
-      const res = await fetch(`/api/business/${businessSlug}?t=${Date.now()}`, {
-        headers: await authHeaders(),
-        cache: 'no-store',
-      })
+      const res = await fetch(`/api/business/${businessSlug}?t=${Date.now()}`, { headers: await authHeaders(), cache: 'no-store' })
       if (res.status === 401 || res.status === 403) { router.replace('/login'); return }
       const data = await res.json()
       setBusiness(data)
-    } catch (err) {
-      console.error('Failed to fetch business:', err)
-    }
+      setDiscountInput(String(data.discount_pct ?? ''))
+    } catch (err) { console.error('Failed to fetch business:', err) }
+  }
+
+  async function handleSaveDiscount() {
+    const pct = parseInt(discountInput)
+    if (isNaN(pct) || pct < 1 || pct > 100) { setDiscountError('1–100 only'); return }
+    setSavingDiscount(true); setDiscountError('')
+    try {
+      const res = await fetch('/api/business/update-discount', {
+        method: 'POST', headers: await authHeaders(),
+        body: JSON.stringify({ slug: businessSlug, discountPct: pct }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setBusiness(prev => prev ? { ...prev, discount_pct: pct } : prev)
+        setDiscountSaved(true); setTimeout(() => setDiscountSaved(false), 3000)
+      } else { setDiscountError(data.error || 'Failed') }
+    } catch { setDiscountError('Something went wrong') }
+    setSavingDiscount(false)
   }
 
   async function fetchSubmissions() {
     try {
-      const res = await fetch(`/api/submissions/${businessSlug}?t=${Date.now()}`, {
-        headers: await authHeaders(),
-        cache: 'no-store',
-      })
+      const res = await fetch(`/api/submissions/${businessSlug}?t=${Date.now()}`, { headers: await authHeaders(), cache: 'no-store' })
       if (res.status === 401 || res.status === 403) return
       const data = await res.json()
       setSubmissions(data.submissions || [])
       setLastSync(new Date().toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
       setLoading(false)
-    } catch (err) {
-      console.error('Failed to fetch submissions:', err)
-      setLoading(false)
-    }
+    } catch (err) { console.error('Failed to fetch submissions:', err); setLoading(false) }
   }
 
   async function handleRedeem(overrideCode?: string) {
     const code = (overrideCode ?? redeemCode).trim().toUpperCase()
     if (!code) return
-    setRedeeming(true)
-    setRedeemResult(null)
+    setRedeeming(true); setRedeemResult(null)
     try {
       const res = await fetch('/api/coupon/redeem', {
-        method: 'POST',
-        headers: await authHeaders(),
+        method: 'POST', headers: await authHeaders(),
         body: JSON.stringify({ code, pin, adminOverride: true, businessId: business?.id }),
       })
       const data = await res.json()
-      if (res.ok) {
-        setRedeemResult({ success: true, message: `✓ Redeemed — ${data.discountPct}% off applied for ${data.businessName}` })
-        setRedeemCode('')
-      } else {
-        setRedeemResult({ error: data.error })
-      }
-    } catch {
-      setRedeemResult({ error: 'Something went wrong' })
-    }
+      if (res.ok) { setRedeemResult({ success: true, message: `${data.discountPct}% off applied for ${data.businessName}` }); setRedeemCode('') }
+      else { setRedeemResult({ error: data.error }) }
+    } catch { setRedeemResult({ error: 'Something went wrong' }) }
     setRedeeming(false)
   }
 
   async function handleSavePin() {
     if (!/^\d{4}$/.test(pin)) { setPinError('Must be exactly 4 digits'); return }
-    setSavingPin(true)
-    setPinError('')
+    setSavingPin(true); setPinError('')
     try {
       const res = await fetch('/api/business/set-pin', {
-        method: 'POST',
-        headers: await authHeaders(),
+        method: 'POST', headers: await authHeaders(),
         body: JSON.stringify({ pin, slug: businessSlug }),
       })
       if (res.ok) { setPinSaved(true); setTimeout(() => setPinSaved(false), 3000) }
       else { const d = await res.json(); setPinError(d.error || 'Failed to save') }
-    } catch {
-      setPinError('Something went wrong')
-    }
+    } catch { setPinError('Something went wrong') }
     setSavingPin(false)
   }
 
+  const reviewUrl = typeof window !== 'undefined' ? `${window.location.origin}/r/${businessSlug}` : ''
+
   function copyReviewLink() {
-    if (!business) return
-    navigator.clipboard.writeText(business.google_review_url)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    navigator.clipboard.writeText(reviewUrl)
+    setCopied(true); setTimeout(() => setCopied(false), 2000)
   }
 
   async function handleSignOut() {
@@ -194,230 +184,193 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
   }
 
   if (!authChecked) {
-    return <div style={{ padding: '40px', textAlign: 'center', color: '#555', fontFamily: 'system-ui, sans-serif' }}>Loading...</div>
+    return <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: color.textFaint, ...text.small }}>Loading…</div>
   }
 
-  const reviewUrl = typeof window !== 'undefined' ? `${window.location.origin}/r/${businessSlug}` : ''
+  const couponsIssued = submissions.filter(s => s.coupon_code).length
+
+  const cardBase: React.CSSProperties = {
+    background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.lg, padding: space[5],
+  }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0f0f0f', padding: '24px 16px', fontFamily: 'system-ui, sans-serif' }}>
-      <div style={{ maxWidth: '760px', margin: '0 auto' }}>
+    <div style={{ minHeight: '100dvh', background: color.bg, padding: `${space[6]} ${space[4]}` }}>
+      <div style={{ maxWidth: '880px', margin: '0 auto' }}>
 
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', flexWrap: 'wrap', gap: '12px' }}>
-          <div>
-            <h1 style={{ color: '#fff', fontSize: '24px', fontWeight: '700', margin: '0 0 4px' }}>
-              {business?.name || businessSlug}
-            </h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <p style={{ color: '#555', fontSize: '13px', margin: 0 }}>{reviewUrl}</p>
-              <button
-                onClick={copyReviewLink}
-                style={{ background: 'none', border: '1px solid #333', color: copied ? '#4ade80' : '#666', padding: '3px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
-              >
-                {copied ? '✓ Copied' : 'Copy link'}
-              </button>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: space[6], flexWrap: 'wrap', gap: space[3] }}>
+          <div style={{ display: 'flex', gap: space[3], alignItems: 'center' }}>
+            <div style={{ width: 44, height: 44, borderRadius: radius.md, background: color.primarySoft, border: `1px solid ${color.primaryBorder}`, color: color.primary, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Store size={22} />
+            </div>
+            <div>
+              <h1 style={{ ...text.h2, color: color.text, margin: 0 }}>{business?.name || businessSlug}</h1>
+              <div style={{ display: 'flex', alignItems: 'center', gap: space[2], flexWrap: 'wrap', marginTop: '2px' }}>
+                <span style={{ ...text.tiny, fontWeight: 400, color: color.textGhost }}>{reviewUrl.replace(/^https?:\/\//, '')}</span>
+                <button onClick={copyReviewLink}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', color: copied ? color.primary : color.textMuted, ...text.tiny, fontWeight: 500, cursor: 'pointer', padding: 0 }}>
+                  {copied ? <><Check size={13} /> Copied</> : <><Copy size={13} /> Copy</>}
+                </button>
+              </div>
             </div>
           </div>
-          <button
-            onClick={handleSignOut}
-            style={{ background: 'none', border: '1px solid #333', color: '#666', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}
-          >
-            Sign out
-          </button>
-        </div>
+          <Button variant="secondary" fullWidth={false} onClick={handleSignOut} style={{ padding: '9px 14px', fontSize: '13px' }}>
+            <LogOut size={15} /> Sign out
+          </Button>
+        </header>
 
-        {/* Redeem Coupon Box */}
-        <div style={{ background: '#1a1a1a', border: '1px solid #2d4a2d', borderRadius: '16px', padding: '24px', marginBottom: '24px' }}>
-          <h2 style={{ color: '#4ade80', fontSize: '16px', fontWeight: '600', margin: '0 0 4px' }}>🎟️ Redeem a Coupon</h2>
-          <p style={{ color: '#666', fontSize: '13px', margin: '0 0 16px' }}>Customer tells you their code — enter it here to apply the discount and mark it used.</p>
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <input
-              type="text"
-              placeholder="RB-XXXX"
-              value={redeemCode}
+        {/* Redeem panel — primary action */}
+        <div style={{
+          background: `linear-gradient(135deg, rgba(52,211,153,0.07), ${color.surface} 55%)`,
+          border: `1px solid ${color.primaryBorder}`, borderRadius: radius.lg, padding: space[5], marginBottom: space[5],
+          boxShadow: shadow.md,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: space[2], marginBottom: space[1] }}>
+            <Ticket size={18} color={color.primary} />
+            <h2 style={{ ...text.h3, color: color.text, margin: 0 }}>Redeem a coupon</h2>
+          </div>
+          <p style={{ ...text.small, color: color.textMuted, margin: `0 0 ${space[4]}` }}>
+            Customer tells you their code — enter it to apply the discount and mark it used.
+          </p>
+          <div style={{ display: 'flex', gap: space[3], flexWrap: 'wrap' }}>
+            <Input
+              placeholder="RB-XXXX" value={redeemCode} maxLength={7}
               onChange={e => { setRedeemCode(e.target.value.toUpperCase()); setRedeemResult(null) }}
               onKeyDown={e => e.key === 'Enter' && handleRedeem()}
-              maxLength={7}
-              style={{
-                flex: 1,
-                minWidth: '120px',
-                padding: '12px 16px',
-                borderRadius: '10px',
-                border: '1px solid #333',
-                background: '#0f0f0f',
-                color: '#fff',
-                fontSize: '18px',
-                fontFamily: 'monospace',
-                letterSpacing: '3px',
-                outline: 'none',
-              }}
+              style={{ flex: 1, minWidth: '140px', fontFamily: 'ui-monospace, monospace', fontSize: '18px', letterSpacing: '0.15em', fontWeight: 600 }}
             />
-            <button
-              onClick={() => handleRedeem()}
-              disabled={redeeming || !redeemCode.trim()}
-              style={{
-                padding: '12px 24px',
-                borderRadius: '10px',
-                border: 'none',
-                background: redeeming || !redeemCode.trim() ? '#333' : '#4ade80',
-                color: redeeming || !redeemCode.trim() ? '#666' : '#0f0f0f',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: redeeming || !redeemCode.trim() ? 'not-allowed' : 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {redeeming ? 'Checking...' : 'Apply & Mark Used'}
-            </button>
+            <Button fullWidth={false} onClick={() => handleRedeem()} loading={redeeming} disabled={!redeemCode.trim()} style={{ whiteSpace: 'nowrap' }}>
+              Apply & mark used
+            </Button>
           </div>
           {redeemResult && (
-            <p style={{ margin: '12px 0 0', fontSize: '14px', color: redeemResult.success ? '#4ade80' : '#f87171', fontWeight: '500' }}>
-              {redeemResult.success ? redeemResult.message : `✗ ${redeemResult.error}`}
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: space[2], marginTop: space[3], ...text.small, color: redeemResult.success ? color.primary : color.danger }}>
+              {redeemResult.success ? <Check size={16} /> : null}
+              {redeemResult.success ? redeemResult.message : redeemResult.error}
+            </div>
           )}
         </div>
 
-        {/* QR + Stats + PIN row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+        {/* Grid: QR · stats+discount · PIN */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: space[4], marginBottom: space[7] }}>
 
-          {/* QR Card */}
-          <div style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
+          {/* QR */}
+          <div style={{ ...cardBase, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             {qrDataUrl && (
-              <img src={qrDataUrl} alt="QR code" style={{ width: '160px', height: '160px', borderRadius: '8px', display: 'block', margin: '0 auto 12px' }} />
-            )}
-            <a
-              href={qrDataUrl}
-              download={`${businessSlug}-qr.png`}
-              style={{ display: 'inline-block', padding: '8px 20px', borderRadius: '8px', background: '#4ade80', color: '#0f0f0f', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}
-            >
-              Download QR
-            </a>
-            <p style={{ color: '#555', fontSize: '11px', marginTop: '8px', marginBottom: 0 }}>Print and place on tables</p>
-          </div>
-
-          {/* Stats */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {[
-              { label: 'Total submissions', value: submissions.length },
-              { label: 'Coupons issued', value: submissions.filter(s => s.coupon_code).length },
-              { label: 'Discount offered', value: business ? `${business.discount_pct}%` : '—' },
-            ].map(stat => (
-              <div key={stat.label} style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: '12px', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <p style={{ color: '#666', fontSize: '13px', margin: 0 }}>{stat.label}</p>
-                <p style={{ color: '#fff', fontSize: '20px', fontWeight: '700', margin: 0 }}>{stat.value}</p>
+              <div style={{ background: '#fff', padding: space[3], borderRadius: radius.md, marginBottom: space[3] }}>
+                <img src={qrDataUrl} alt="QR code for your review page" style={{ width: '150px', height: '150px', display: 'block' }} />
               </div>
-            ))}
+            )}
+            <a href={qrDataUrl} download={`${businessSlug}-qr.png`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: space[2], padding: '9px 18px', borderRadius: radius.md, background: color.surfaceRaised, border: `1px solid ${color.border}`, color: color.text, ...text.small, fontWeight: 600, textDecoration: 'none' }}>
+              <Download size={15} /> Download QR
+            </a>
+            <p style={{ ...text.tiny, fontWeight: 400, color: color.textGhost, margin: `${space[2]} 0 0` }}>Print and place on tables</p>
           </div>
 
-          {/* PIN Setup */}
-          <div style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: '16px', padding: '20px' }}>
-            <h3 style={{ color: '#fff', fontSize: '14px', fontWeight: '600', margin: '0 0 4px' }}>🔐 Staff Redemption PIN</h3>
-            <p style={{ color: '#555', fontSize: '12px', margin: '0 0 14px', lineHeight: '1.5' }}>
-              Set a 4-digit PIN. Staff enter this on the customer's phone to redeem coupons.
+          {/* Stats + discount */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: space[3] }}>
+            <div style={{ display: 'flex', gap: space[3] }}>
+              <StatTile icon={<Sparkles size={16} />} label="Submissions" value={submissions.length} />
+              <StatTile icon={<Gift size={16} />} label="Coupons" value={couponsIssued} />
+            </div>
+            <div style={cardBase}>
+              <p style={{ ...text.tiny, fontWeight: 400, color: color.textMuted, margin: `0 0 ${space[2]}` }}>Discount offered</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: space[2] }}>
+                <Input type="number" min="1" max="100" value={discountInput}
+                  onChange={e => { setDiscountInput(e.target.value); setDiscountError(''); setDiscountSaved(false) }}
+                  onKeyDown={e => e.key === 'Enter' && handleSaveDiscount()}
+                  style={{ width: '72px', fontSize: '18px', fontWeight: 700, padding: '8px 10px' }} />
+                <span style={{ ...text.h2, color: color.text }}>%</span>
+                <div style={{ marginLeft: 'auto' }}>
+                  <Button fullWidth={false} variant={discountSaved ? 'secondary' : 'primary'} onClick={handleSaveDiscount}
+                    loading={savingDiscount} disabled={discountInput === String(business?.discount_pct ?? '')}
+                    style={{ padding: '8px 14px', fontSize: '13px' }}>
+                    {discountSaved ? <><Check size={14} /> Saved</> : 'Save'}
+                  </Button>
+                </div>
+              </div>
+              {discountError && <p style={{ ...text.tiny, color: color.danger, margin: `${space[2]} 0 0` }}>{discountError}</p>}
+            </div>
+          </div>
+
+          {/* PIN setup */}
+          <div style={cardBase}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: space[2], marginBottom: space[1] }}>
+              <Lock size={16} color={color.textMuted} />
+              <h3 style={{ ...text.h3, color: color.text, margin: 0 }}>Staff PIN</h3>
+            </div>
+            <p style={{ ...text.tiny, fontWeight: 400, color: color.textGhost, margin: `0 0 ${space[4]}`, lineHeight: 1.5 }}>
+              Staff enter this on the customer&apos;s phone to redeem coupons.
             </p>
-            <input
-              type="password"
-              inputMode="numeric"
-              maxLength={4}
-              placeholder="••••"
-              value={pin}
+            <Input type="password" inputMode="numeric" maxLength={4} placeholder="••••" value={pin}
               onChange={e => { setPin(e.target.value.replace(/\D/g, '')); setPinError(''); setPinSaved(false) }}
-              style={{
-                width: '100%',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                border: `1px solid ${pinError ? '#f87171' : '#333'}`,
-                background: '#0f0f0f',
-                color: '#fff',
-                fontSize: '20px',
-                letterSpacing: '8px',
-                textAlign: 'center',
-                outline: 'none',
-                boxSizing: 'border-box',
-                marginBottom: '8px',
-              }}
-            />
-            {pinError && <p style={{ color: '#f87171', fontSize: '12px', margin: '0 0 8px' }}>{pinError}</p>}
-            <button
-              onClick={handleSavePin}
-              disabled={savingPin || pin.length !== 4}
-              style={{
-                width: '100%',
-                padding: '10px',
-                borderRadius: '8px',
-                border: 'none',
-                background: pinSaved ? '#166534' : savingPin || pin.length !== 4 ? '#333' : '#4ade80',
-                color: pinSaved ? '#4ade80' : savingPin || pin.length !== 4 ? '#666' : '#0f0f0f',
-                fontSize: '13px',
-                fontWeight: '600',
-                cursor: savingPin || pin.length !== 4 ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {pinSaved ? '✓ PIN Saved' : savingPin ? 'Saving...' : 'Save PIN'}
-            </button>
+              style={{ textAlign: 'center', fontSize: '22px', letterSpacing: '0.4em', fontWeight: 700, marginBottom: space[2] }} />
+            {pinError && <p style={{ ...text.tiny, color: color.danger, margin: `0 0 ${space[2]}` }}>{pinError}</p>}
+            <Button variant={pinSaved ? 'secondary' : 'primary'} onClick={handleSavePin} loading={savingPin} disabled={pin.length !== 4}
+              style={{ padding: '10px', fontSize: '13px' }}>
+              {pinSaved ? <><Check size={14} /> PIN saved</> : 'Save PIN'}
+            </Button>
           </div>
         </div>
 
         {/* Submissions */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 16px', flexWrap: 'wrap', gap: '8px' }}>
-          <h2 style={{ color: '#fff', fontSize: '18px', fontWeight: '600', margin: 0 }}>
-            Review submissions ({submissions.length})
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: space[4], flexWrap: 'wrap', gap: space[2] }}>
+          <h2 style={{ ...text.h2, color: color.text, margin: 0 }}>
+            Review submissions <span style={{ color: color.textGhost, fontWeight: 500 }}>({submissions.length})</span>
           </h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {lastSync && <span style={{ color: '#444', fontSize: '12px' }}>Synced {lastSync}</span>}
-            <button
-              onClick={() => fetchSubmissions()}
-              style={{ background: 'none', border: '1px solid #333', color: '#888', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}
-            >
-              ↻ Refresh
+          <div style={{ display: 'flex', alignItems: 'center', gap: space[3] }}>
+            {lastSync && <span className="tnum" style={{ ...text.tiny, fontWeight: 400, color: color.textGhost }}>Synced {lastSync}</span>}
+            <button onClick={() => fetchSubmissions()}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: color.surface, border: `1px solid ${color.border}`, color: color.textMuted, padding: '7px 12px', borderRadius: radius.sm, ...text.tiny, fontWeight: 500, cursor: 'pointer' }}>
+              <Refresh size={13} /> Refresh
             </button>
           </div>
         </div>
 
         {loading ? (
-          <p style={{ color: '#555', textAlign: 'center', padding: '40px' }}>Loading...</p>
+          <p style={{ ...text.small, color: color.textFaint, textAlign: 'center', padding: `${space[8]} 0` }}>Loading…</p>
         ) : submissions.length === 0 ? (
-          <div style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: '12px', padding: '48px', textAlign: 'center' }}>
-            <p style={{ color: '#555', fontSize: '14px', margin: 0 }}>No submissions yet. Share your QR code to get started.</p>
+          <div style={{ ...cardBase, padding: `${space[9]} ${space[6]}`, textAlign: 'center' }}>
+            <div style={{ display: 'inline-flex', marginBottom: space[3], color: color.textFaint }}><Sparkles size={28} /></div>
+            <p style={{ ...text.small, color: color.textMuted, margin: 0 }}>No submissions yet. Share your QR code to get started.</p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: space[2] }}>
             {submissions.map(sub => (
-              <div
-                key={sub.id}
-                style={{
-                  background: '#1a1a1a',
-                  border: '1px solid #2a2a2a',
-                  borderRadius: '12px',
-                  padding: '14px 18px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '12px',
-                  flexWrap: 'wrap',
-                }}
-              >
+              <div key={sub.id} style={{
+                background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.md,
+                padding: `${space[4]} ${space[5]}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: space[3], flexWrap: 'wrap',
+              }}>
                 <div style={{ flex: 1, minWidth: '140px' }}>
-                  <p style={{ color: '#fff', fontSize: '15px', fontWeight: '600', margin: '0 0 2px' }}>{sub.customer_name}</p>
-                  <p style={{ color: '#555', fontSize: '12px', margin: '0 0 2px' }}>{sub.customer_phone}</p>
-                  <p style={{ color: '#444', fontSize: '12px', margin: 0 }}>{timeAgo(sub.created_at)}</p>
+                  <p style={{ ...text.h3, color: color.text, margin: '0 0 2px' }}>{sub.customer_name}</p>
+                  <p className="tnum" style={{ ...text.tiny, fontWeight: 400, color: color.textFaint, margin: 0 }}>
+                    {sub.customer_phone} · {timeAgo(sub.created_at)}
+                  </p>
                 </div>
-
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  {sub.coupon_code ? (
-                    <p style={{ color: '#888', fontSize: '13px', margin: 0, fontFamily: 'monospace', letterSpacing: '1px' }}>
-                      {sub.coupon_code}
-                    </p>
-                  ) : (
-                    <p style={{ color: '#555', fontSize: '12px', margin: 0 }}>No coupon</p>
-                  )}
-                </div>
+                {sub.coupon_code ? (
+                  <span className="tnum" style={{ fontFamily: 'ui-monospace, monospace', ...text.small, fontWeight: 600, color: color.textMuted, letterSpacing: '0.12em', background: color.surfaceRaised, border: `1px solid ${color.border}`, borderRadius: radius.sm, padding: '6px 12px' }}>
+                    {sub.coupon_code}
+                  </span>
+                ) : (
+                  <span style={{ ...text.tiny, color: color.textGhost }}>No coupon</span>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function StatTile({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+  return (
+    <div style={{ flex: 1, background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.lg, padding: space[4] }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: color.textMuted, marginBottom: space[2] }}>
+        {icon}<span style={{ ...text.tiny, fontWeight: 400 }}>{label}</span>
+      </div>
+      <p className="tnum" style={{ fontSize: '26px', fontWeight: 700, color: color.text, margin: 0, letterSpacing: '-0.02em' }}>{value}</p>
     </div>
   )
 }

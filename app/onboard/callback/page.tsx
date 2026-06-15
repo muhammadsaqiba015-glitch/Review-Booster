@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { CenteredPage, Card, IconBadge, Title, Subtitle, Button, Spinner, color, space, text } from '@/components/ui'
+import { XCircle } from '@/components/icons'
 
 type State = 'loading' | 'creating' | 'error'
 
@@ -72,68 +74,28 @@ export default function OnboardCallback() {
     return () => { subscription.unsubscribe(); clearTimeout(timeout) }
   }, [router])
 
-  const cardStyle: React.CSSProperties = {
-    minHeight: '100vh',
-    background: '#0f0f0f',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '24px',
-    fontFamily: 'system-ui, sans-serif',
-  }
-
-  const boxStyle: React.CSSProperties = {
-    background: '#1a1a1a',
-    borderRadius: '24px',
-    padding: '48px 32px',
-    maxWidth: '380px',
-    width: '100%',
-    textAlign: 'center',
-    border: '1px solid #2a2a2a',
-  }
-
   if (state === 'error') {
     return (
-      <div style={cardStyle}>
-        <div style={boxStyle}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>❌</div>
-          <h1 style={{ color: '#fff', fontSize: '20px', fontWeight: '600', margin: '0 0 12px' }}>
-            Something went wrong
-          </h1>
-          <p style={{ color: '#888', fontSize: '14px', margin: '0 0 24px' }}>{errorMsg}</p>
-          <button
-            onClick={() => router.replace('/login')}
-            style={{
-              padding: '12px 24px',
-              borderRadius: '10px',
-              border: 'none',
-              background: '#4ade80',
-              color: '#0f0f0f',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: 'pointer',
-            }}
-          >
-            Request a new link
-          </button>
-        </div>
-      </div>
+      <CenteredPage>
+        <Card style={{ textAlign: 'center' }}>
+          <IconBadge tone="neutral"><XCircle size={26} color={color.danger} /></IconBadge>
+          <Title style={{ marginTop: space[5] }}>Something went wrong</Title>
+          <Subtitle style={{ marginTop: space[2], marginBottom: space[6], ...text.small }}>{errorMsg}</Subtitle>
+          <Button onClick={() => router.replace('/login')}>Request a new link</Button>
+        </Card>
+      </CenteredPage>
     )
   }
 
   return (
-    <div style={cardStyle}>
-      <div style={boxStyle}>
-        <div style={{ fontSize: '48px', marginBottom: '16px' }}>
-          {state === 'creating' ? '🏗️' : '⏳'}
-        </div>
-        <h1 style={{ color: '#fff', fontSize: '20px', fontWeight: '600', margin: '0 0 12px' }}>
-          {state === 'creating' ? 'Setting up your business...' : 'Signing you in...'}
-        </h1>
-        <p style={{ color: '#666', fontSize: '14px', margin: 0 }}>
-          This only takes a second.
-        </p>
-      </div>
-    </div>
+    <CenteredPage>
+      <Card style={{ textAlign: 'center' }}>
+        <IconBadge><Spinner size={24} c={color.primary} /></IconBadge>
+        <Title style={{ marginTop: space[5] }}>
+          {state === 'creating' ? 'Setting up your business…' : 'Signing you in…'}
+        </Title>
+        <Subtitle style={{ marginTop: space[2], ...text.small }}>This only takes a second.</Subtitle>
+      </Card>
+    </CenteredPage>
   )
 }
