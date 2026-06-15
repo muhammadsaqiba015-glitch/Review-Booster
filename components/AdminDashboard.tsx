@@ -5,7 +5,7 @@ import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
 import type { Session } from '@supabase/supabase-js'
 import { color, radius, space, text, shadow, Button, Input } from '@/components/ui'
-import { Ticket, Lock, Copy, Check, LogOut, Download, Refresh, Gift, Sparkles, Store } from '@/components/icons'
+import { Ticket, Lock, Copy, Check, LogOut, Download, Refresh, Gift, Sparkles, Store, Star } from '@/components/icons'
 
 interface Submission {
   id: string
@@ -58,6 +58,12 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
   const [discountSaved, setDiscountSaved] = useState(false)
   const [discountError, setDiscountError] = useState('')
 
+  // Review link edit
+  const [reviewLinkInput, setReviewLinkInput] = useState('')
+  const [savingLink, setSavingLink] = useState(false)
+  const [linkSaved, setLinkSaved] = useState(false)
+  const [linkError, setLinkError] = useState('')
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) { router.replace('/login'); return }
@@ -109,7 +115,27 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
       const data = await res.json()
       setBusiness(data)
       setDiscountInput(String(data.discount_pct ?? ''))
+      setReviewLinkInput(data.google_review_url ?? '')
     } catch (err) { console.error('Failed to fetch business:', err) }
+  }
+
+  async function handleSaveReviewLink() {
+    const url = reviewLinkInput.trim()
+    if (!url) { setLinkError('Enter a review link'); return }
+    if (!url.includes('google.com') && !url.includes('g.page')) { setLinkError('Must be a Google Maps or review link'); return }
+    setSavingLink(true); setLinkError('')
+    try {
+      const res = await fetch('/api/business/update-review-link', {
+        method: 'POST', headers: await authHeaders(),
+        body: JSON.stringify({ slug: businessSlug, reviewUrl: url }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setBusiness(prev => prev ? { ...prev, google_review_url: url } : prev)
+        setLinkSaved(true); setTimeout(() => setLinkSaved(false), 3000)
+      } else { setLinkError(data.error || 'Failed') }
+    } catch { setLinkError('Something went wrong') }
+    setSavingLink(false)
   }
 
   async function handleSaveDiscount() {
@@ -312,6 +338,31 @@ export default function AdminDashboard({ businessSlug }: { businessSlug: string 
               {pinSaved ? <><Check size={14} /> PIN saved</> : 'Save PIN'}
             </Button>
           </div>
+        </div>
+
+        {/* Google review link editor */}
+        <div style={{ ...cardBase, marginBottom: space[7] }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: space[2], marginBottom: space[1] }}>
+            <Star size={16} color={color.textMuted} />
+            <h3 style={{ ...text.h3, color: color.text, margin: 0 }}>Google review link</h3>
+          </div>
+          <p style={{ ...text.tiny, fontWeight: 400, color: color.textGhost, margin: `0 0 ${space[4]}`, lineHeight: 1.5 }}>
+            Where customers are sent to leave their review. Update it here if it was wrong.
+          </p>
+          <div style={{ display: 'flex', gap: space[3], flexWrap: 'wrap' }}>
+            <Input
+              type="url" placeholder="https://search.google.com/local/writereview?placeid=…" value={reviewLinkInput}
+              onChange={e => { setReviewLinkInput(e.target.value); setLinkError(''); setLinkSaved(false) }}
+              onKeyDown={e => e.key === 'Enter' && handleSaveReviewLink()}
+              style={{ flex: 1, minWidth: '200px', fontSize: '14px' }}
+            />
+            <Button fullWidth={false} variant={linkSaved ? 'secondary' : 'primary'} onClick={handleSaveReviewLink}
+              loading={savingLink} disabled={reviewLinkInput.trim() === (business?.google_review_url ?? '')}
+              style={{ whiteSpace: 'nowrap' }}>
+              {linkSaved ? <><Check size={14} /> Saved</> : 'Save link'}
+            </Button>
+          </div>
+          {linkError && <p style={{ ...text.tiny, color: color.danger, margin: `${space[2]} 0 0` }}>{linkError}</p>}
         </div>
 
         {/* Submissions */}
