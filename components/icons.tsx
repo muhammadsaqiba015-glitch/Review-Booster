@@ -192,6 +192,15 @@ export function QrCode({ size = 24, color = 'currentColor', style, strokeWidth =
   )
 }
 
+export function Calculator({ size = 24, color = 'currentColor', style, strokeWidth = 1.75 }: IconProps) {
+  return (
+    <svg {...base(size, strokeWidth)} style={{ color, ...style }}>
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <path d="M8 6h8M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14v4M8 18h4" />
+    </svg>
+  )
+}
+
 export function Sparkles({ size = 24, color = 'currentColor', style, strokeWidth = 1.75 }: IconProps) {
   return (
     <svg {...base(size, strokeWidth)} style={{ color, ...style }}>
